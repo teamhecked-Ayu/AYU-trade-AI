@@ -1,6 +1,10 @@
 import asyncio
-import logging
+from typing import List, Optional, Dict, Any
+from loguru import logger
 import pandas as pd
+import numpy as np
+from pydantic import BaseModel
+
 from core.signal_aggregator import SignalAggregator
 from core.risk_manager import RiskManager
 from core.arbitrage import ArbitrageEngine
@@ -8,69 +12,87 @@ from core.broker_bridge import BrokerBridge
 from indicators.custom import TechnicalIndicators
 from models.sentiment_fusion import SentimentFusion
 
+class EngineConfig(BaseModel):
+    exchanges: List[str] = ["binance"]
+    strategies: List[str] = ["sentiment", "technical", "arbitrage"]
+    update_interval: float = 1.0
+    paper_trade: bool = True
+
 class TradingEngine:
-    def __init__(self, exchanges=None, strategies=None):
-        self.logger = logging.getLogger("AYU-Engine")
+    """
+    The heart of AYU-trade-AI. Orchestrates data ingestion, 
+    signal processing, and order execution.
+    """
+    def __init__(self, config: Optional[EngineConfig] = None):
+        self.config = config or EngineConfig()
         self.aggregator = SignalAggregator()
         self.risk_manager = RiskManager()
         self.bridge = BrokerBridge()
         self.sentiment_fusion = SentimentFusion()
         
-        self.exchanges_list = exchanges or ["binance"]
-        self.strategies = strategies or ["sentiment", "technical", "arbitrage"]
         self.is_running = False
+        self._loop_task: Optional[asyncio.Task] = None
 
-    async def initialize(self):
-        self.logger.info("Initializing Sub-systems...")
-        # In production, load API keys from .env
-        # for ex in self.exchanges_list:
-        #     await self.bridge.init_crypto_exchange(ex, "KEY", "SECRET")
+    async def initialize(self) -> None:
+        """Bootstraps all sub-systems with institutional precision."""
+        logger.info("<green>Initializing AYU-trade-AI Sub-systems...</green>")
+        # Initialize bridge and arbitrage engine
         self.arbitrage_engine = ArbitrageEngine(list(self.bridge.crypto_exchanges.values()))
+        logger.success("Sub-systems online.")
 
-    async def run_interactive(self):
-        await self.initialize()
-        self.is_running = True
-        self.logger.info("Interactive Mode: Listening to WebSocket streams and decoding psychology...")
-        
+    async def _main_loop(self) -> None:
+        """The core execution pipeline."""
         while self.is_running:
             try:
-                # 1. Fetch Market Data & Sentiment
-                sentiment_score = await self.sentiment_fusion.fetch_and_fuse()
+                # 1. Parallel Data Ingestion
+                sentiment_task = asyncio.create_task(self.sentiment_fusion.fetch_and_fuse())
                 
-                # 2. Compute Technical Indicators (Mock data for demo)
-                mock_data = {
-                    'open': np.random.uniform(50000, 60000, 100),
-                    'high': np.random.uniform(50000, 60000, 100),
-                    'low': np.random.uniform(50000, 60000, 100),
-                    'close': np.random.uniform(50000, 60000, 100),
-                    'volume': np.random.uniform(1, 10, 100)
-                }
-                df = pd.DataFrame(mock_data)
-                df = TechnicalIndicators.compute_all(df)
-                tech_score = TechnicalIndicators.get_signal(df)
-
-                # 3. Aggregate Signals
-                ensemble_signal = await self.aggregator.get_consensus_signal()
-                # Fuse custom scores into ensemble
-                fused_score = (ensemble_signal['score'] + sentiment_score + tech_score) / 3
+                # 2. Market Analysis
+                mock_df = self._generate_mock_market_data()
+                df_with_indicators = TechnicalIndicators.compute_all(mock_df)
+                tech_score = TechnicalIndicators.get_signal(df_with_indicators)
                 
-                self.logger.info(f"Fused Consensus: {fused_score:.4f} | Sentiment: {sentiment_score:.2f} | Tech: {tech_score:.2f}")
+                sentiment_score = await sentiment_task
+                
+                # 3. Signal Fusion via Aggregator
+                consensus = await self.aggregator.get_consensus_signal()
+                fused_score = (consensus['score'] + sentiment_score + tech_score) / 3
+                
+                logger.debug(f"Signal Fusion | Consensus: {fused_score:.4f} | Confidence: {consensus['confidence']:.2f}")
 
-                # 4. Risk Validation & Execution
-                if self.risk_manager.validate_signal({"score": fused_score, "confidence": ensemble_signal['confidence']}):
-                    side = "buy" if fused_score > 0.3 else "sell" if fused_score < -0.3 else None
+                # 4. Risk-Adjusted Execution
+                if self.risk_manager.validate_signal({"score": fused_score, "confidence": consensus['confidence']}):
+                    side = "buy" if fused_score > 0.4 else "sell" if fused_score < -0.4 else None
                     if side:
                         await self.bridge.execute_order("binance", "BTC/USDT", side, 0.001)
 
-                await asyncio.sleep(2) # Sub-second latency in production via WebSockets
+                await asyncio.sleep(self.config.update_interval)
             except Exception as e:
-                self.logger.error(f"Engine Loop Error: {e}")
+                logger.error(f"Engine Failure: {e}")
                 await asyncio.sleep(5)
 
-    async def run_daemon(self):
+    def _generate_mock_market_data(self) -> pd.DataFrame:
+        """Internal helper for streaming simulation."""
+        return pd.DataFrame({
+            'open': np.random.uniform(50000, 60000, 100),
+            'high': np.random.uniform(50000, 60000, 100),
+            'low': np.random.uniform(50000, 60000, 100),
+            'close': np.random.uniform(50000, 60000, 100),
+            'volume': np.random.uniform(1, 10, 100)
+        })
+
+    async def start(self) -> None:
         await self.initialize()
         self.is_running = True
-        self.logger.info("Daemon Mode: Autonomous Warfare Engaged.")
-        while self.is_running:
-            # Headless execution logic
-            await asyncio.sleep(60)
+        self._loop_task = asyncio.create_task(self._main_loop())
+        logger.info("Trading Oracle Engaged.")
+
+    async def stop(self) -> None:
+        self.is_running = False
+        if self._loop_task:
+            self._loop_task.cancel()
+            try:
+                await self._loop_task
+            except asyncio.CancelledError:
+                pass
+        logger.warning("Trading Oracle Disengaged.")

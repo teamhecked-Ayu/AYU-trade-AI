@@ -16,9 +16,14 @@ async def main():
     engine = TradingEngine()
     
     if args.mode == "interactive":
-        await engine.run_interactive()
+        from utils.dashboard import AYUDashboard
+        dashboard = AYUDashboard()
+        await asyncio.gather(engine.start(), dashboard.run())
     else:
-        await engine.run_daemon()
+        await engine.start()
+        # Keep daemon alive
+        while True:
+            await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     try:

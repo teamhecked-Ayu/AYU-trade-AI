@@ -10,14 +10,19 @@ AYU-trade-AI is a self-learning, multi-strategy execution engine designed for 24
 - **Institutional Precision**: Aggregates order-book depth, funding rates, and open interest.
 - **Professional Risk Management**: Kelly Criterion, trailing stops, and daily loss limits.
 
-## Quick Start
-1. **Clone the Repo**: `git clone https://github.com/teamhecked-Ayu/AYU-trade-AI.git`
-2. **Setup Environment**: `python -m venv venv && source venv/bin/activate`
-3. **Install Dependencies**: `pip install -r requirements.txt`
-4. **Configure**: Copy `.env.example` to `.env` and add your API keys.
-5. **Launch**: 
-   - Interactive: `python cli.py --mode interactive`
-   - Daemon: `python daemon.py --exchanges binance --strategies sentiment,technical`
+## 🚀 Quick Start
+For detailed OS-specific instructions (Linux, macOS, Windows), see [INSTALL.md](docs/INSTALL.md).
+
+1. **Clone & Setup**:
+   ```bash
+   git clone https://github.com/teamhecked-Ayu/AYU-trade-AI.git
+   cd AYU-trade-AI
+   python -m venv venv && source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+2. **Launch the Oracle**:
+   - **Interactive Dashboard**: `python cli.py --mode interactive`
+   - **Headless Daemon**: `python cli.py --mode daemon`
 
 ## Architecture
 - **Language**: Python 3.11+

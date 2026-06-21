@@ -13,3 +13,8 @@ beautifulsoup4
 requests
 vaderSentiment
 torch
+rich
+textual
+loguru
+pydantic
+typing-extensions
