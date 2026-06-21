@@ -1,0 +1,15 @@
+ccxt
+TA-Lib
+transformers
+pandas
+numpy
+websockets
+kiteconnect
+python-dotenv
+schedule
+pyyaml
+scipy
+beautifulsoup4
+requests
+vaderSentiment
+torch
