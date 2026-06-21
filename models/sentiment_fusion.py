@@ -8,16 +8,23 @@ class SentimentFusion:
     def __init__(self):
         # VADER for quick rule-based sentiment
         self.vader = SentimentIntensityAnalyzer()
-        
-        # FinBERT for deep financial context decoding
         self.finbert_model_name = "ProsusAI/finbert"
-        self.tokenizer = AutoTokenizer.from_pretrained(self.finbert_model_name)
-        self.model = AutoModelForSequenceClassification.from_pretrained(self.finbert_model_name)
+        self.tokenizer = None
+        self.model = None
+
+    def _load_finbert(self):
+        if self.tokenizer is None:
+            from loguru import logger
+            logger.info("Loading FinBERT Transformer model...")
+            self.tokenizer = AutoTokenizer.from_pretrained(self.finbert_model_name)
+            self.model = AutoModelForSequenceClassification.from_pretrained(self.finbert_model_name)
+            logger.success("FinBERT Loaded.")
         
     def get_vader_score(self, text):
         return self.vader.polarity_scores(text)['compound']
 
     def get_finbert_score(self, text):
+        self._load_finbert()
         inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
         outputs = self.model(**inputs)
         probs = torch.nn.functional.softmax(outputs.logits, dim=-1)

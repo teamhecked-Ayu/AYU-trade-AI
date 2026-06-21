@@ -82,6 +82,7 @@ class TradingEngine:
         })
 
     async def start(self) -> None:
+        logger.info("Starting Engine...")
         await self.initialize()
         self.is_running = True
         self._loop_task = asyncio.create_task(self._main_loop())

@@ -1,6 +1,6 @@
 import asyncio
 import argparse
-import logging
+from loguru import logger
 from core.engine import TradingEngine
 from utils.logger import setup_logger
 
@@ -10,7 +10,6 @@ async def main():
     args = parser.parse_args()
 
     setup_logger()
-    logger = logging.getLogger("AYU-CLI")
     logger.info(f"Starting AYU-trade-AI in {args.mode} mode...")
 
     engine = TradingEngine()
