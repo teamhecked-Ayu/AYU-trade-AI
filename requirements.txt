@@ -18,3 +18,5 @@ textual
 loguru
 pydantic
 typing-extensions
+
+openai
