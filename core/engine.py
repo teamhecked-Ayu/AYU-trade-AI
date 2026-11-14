@@ -37,6 +37,9 @@ class TradingEngine:
         self.market_data = market_data or CCXTMarketDataProvider()
         
         self.is_running = False
+        self.consecutive_failures = 0
+        self.last_error: Optional[str] = None
+        self.last_success_at: Optional[float] = None
         self._loop_task: Optional[asyncio.Task] = None
 
     async def initialize(self) -> None:
@@ -85,10 +88,26 @@ class TradingEngine:
                             price=float(market_df["close"].iloc[-1])
                         )
 
+                self.consecutive_failures = 0
+                self.last_error = None
+                self.last_success_at = asyncio.get_running_loop().time()
                 await asyncio.sleep(self.config.update_interval)
             except Exception as e:
-                logger.error(f"Engine Failure: {e}")
-                await asyncio.sleep(5)
+                self.consecutive_failures += 1
+                self.last_error = str(e)
+                delay = min(30, 2 ** min(self.consecutive_failures, 5))
+                logger.error(f"Engine Failure ({self.consecutive_failures}): {e}")
+                await asyncio.sleep(delay)
+
+    def status(self) -> Dict[str, Any]:
+        return {
+            "running": self.is_running,
+            "consecutive_failures": self.consecutive_failures,
+            "last_error": self.last_error,
+            "last_success_at": self.last_success_at,
+            "paper_trade": self.config.paper_trade,
+            "symbol": self.config.symbol,
+        }
 
     async def start(self) -> None:
         logger.info("Starting Engine...")
