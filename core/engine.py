@@ -80,7 +80,10 @@ class TradingEngine:
                 if self.risk_manager.validate_signal({"score": fused_score, "confidence": consensus['confidence']}):
                     side = "buy" if consensus["action"] == "BUY" else "sell" if consensus["action"] == "SELL" else None
                     if side:
-                        await self.bridge.execute_order(self.config.exchanges[0], self.config.symbol, side, 0.001)
+                        await self.bridge.execute_order(
+                            self.config.exchanges[0], self.config.symbol, side, 0.001,
+                            price=float(market_df["close"].iloc[-1])
+                        )
 
                 await asyncio.sleep(self.config.update_interval)
             except Exception as e:
