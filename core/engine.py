@@ -10,7 +10,6 @@ from core.sentiment_data import SentimentDataProvider
 from core.risk_manager import RiskManager
 from core.arbitrage import ArbitrageEngine
 from core.broker_bridge import BrokerBridge
-from indicators.custom import TechnicalIndicators
 from models.sentiment_fusion import SentimentFusion
 
 class EngineConfig(BaseModel):
@@ -61,6 +60,7 @@ class TradingEngine:
                     self.config.exchanges[0], self.config.symbol,
                     self.config.timeframe, self.config.candle_limit
                 )
+                from indicators.custom import TechnicalIndicators
                 df_with_indicators = TechnicalIndicators.compute_all(market_df)
                 tech_score = TechnicalIndicators.get_signal(df_with_indicators)
                 
