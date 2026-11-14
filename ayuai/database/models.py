@@ -28,3 +28,12 @@ class AgentPerformanceModel(Base):
     agent: Mapped[str] = mapped_column(String(128), index=True)
     predictions: Mapped[int] = mapped_column(default=0)
     correct: Mapped[int] = mapped_column(default=0)
+
+
+class ProviderCredentialModel(Base):
+    __tablename__ = "provider_credentials"
+    user_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32), primary_key=True)
+    ciphertext: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
