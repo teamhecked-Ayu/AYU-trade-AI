@@ -18,3 +18,7 @@ textual
 loguru
 pydantic
 typing-extensions
+
+fastapi
+uvicorn[standard]
+pytest
