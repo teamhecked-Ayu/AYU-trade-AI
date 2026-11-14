@@ -44,4 +44,4 @@ News Data ───┘              ↓
 
 ## Known limitations
 
-The current paper portfolio is in-memory and is not persistent. Live exchange execution requires explicit credentials and additional production hardening.
+Paper portfolio state is persisted locally with SQLite. Live exchange execution requires explicit credentials and additional production hardening. The current API has no authentication and must not be exposed publicly without an authentication layer.
