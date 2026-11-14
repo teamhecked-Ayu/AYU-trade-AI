@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic
+pandas
+numpy
+scipy
+ccxt
+requests
+beautifulsoup4
+vaderSentiment
+loguru
+pytest
+httpx<0.28
