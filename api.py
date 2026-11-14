@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Header, Request
 import time
+import hmac
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -41,7 +42,7 @@ async def metrics(x_api_key: str | None = Header(default=None)):
 async def require_api_key(x_api_key: str | None = Header(default=None)):
     if not API_KEY:
         raise HTTPException(status_code=503, detail="API key is not configured")
-    if x_api_key != API_KEY:
+    if not x_api_key or not hmac.compare_digest(x_api_key, API_KEY):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
