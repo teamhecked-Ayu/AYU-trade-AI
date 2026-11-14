@@ -18,5 +18,9 @@ textual
 loguru
 pydantic
 typing-extensions
-
 openai
+sqlalchemy
+asyncpg
+aiosqlite
+cryptography
+pytest-asyncio
