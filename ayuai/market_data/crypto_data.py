@@ -12,7 +12,11 @@ class CCXTMarketDataProvider:
     No order-placement methods are exposed here. This layer is for analysis.
     """
 
-    def __init__(self, exchange_id: str = "binance") -> None:
+    def __init__(self, exchange_id: str = "binance", exchange: Any | None = None) -> None:
+        self.exchange_id = exchange_id
+        if exchange is not None:
+            self.exchange = exchange
+            return
         try:
             import ccxt
         except ImportError as exc:
@@ -21,14 +25,13 @@ class CCXTMarketDataProvider:
         exchange_class = getattr(ccxt, exchange_id, None)
         if exchange_class is None:
             raise MarketDataError(f"Unsupported exchange: {exchange_id}")
-        self.exchange_id = exchange_id
         self.exchange = exchange_class({"enableRateLimit": True})
 
     def fetch_snapshot(self, symbol: str) -> MarketSnapshot:
         try:
             ticker: dict[str, Any] = self.exchange.fetch_ticker(symbol)
         except Exception as exc:
-            raise MarketDataError(f"Failed to fetch {symbol} from {self.exchange_id}: {exc}") from exc
+            raise MarketDataError(f"Market data request failed for {symbol}.") from exc
 
         price = ticker.get("last") or ticker.get("close")
         if price is None:
@@ -59,9 +62,7 @@ class CCXTMarketDataProvider:
         try:
             rows = self.exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
         except Exception as exc:
-            raise MarketDataError(
-                f"Failed to fetch OHLCV for {symbol} from {self.exchange_id}: {exc}"
-            ) from exc
+            raise MarketDataError(f"Historical market data request failed for {symbol}.") from exc
 
         candles: list[MarketCandle] = []
         for timestamp, open_, high, low, close, volume in rows:
