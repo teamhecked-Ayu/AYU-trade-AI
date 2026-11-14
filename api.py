@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from core.paper_portfolio import PaperPortfolio
@@ -22,6 +23,15 @@ class PaperOrder(BaseModel):
 @app.get("/health")
 async def health():
     return {**health_state.snapshot(), "mode": "paper"}
+
+
+@app.get("/metrics")
+async def metrics():
+    return {
+        "trade_count": len(portfolio.trades),
+        "position_count": len([p for p in portfolio.positions.values() if p.quantity != 0]),
+        "cash": portfolio.cash,
+    }
 
 
 @app.get("/portfolio")
