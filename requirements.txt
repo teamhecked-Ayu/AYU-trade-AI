@@ -24,3 +24,5 @@ asyncpg
 aiosqlite
 cryptography
 pytest-asyncio
+fastapi
+uvicorn
