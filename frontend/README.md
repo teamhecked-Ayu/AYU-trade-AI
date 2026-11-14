@@ -1,17 +1,9 @@
-# AYUAI Dashboard
+# AYU Trade AI Dashboard
 
-Static frontend foundation for the AYUAI API.
+Static frontend for the paper-trading API.
 
-## Run locally
+Start the API first, then serve the frontend with a local web server:
 
-Serve this folder with any static web server, then ensure the API is running on the URL shown in the dashboard.
+    python -m http.server 8080 --directory frontend
 
-The dashboard currently supports:
-
-- Registration and login
-- API health checks
-- Provider connection count
-- Analysis submission
-- Analysis job polling and result display
-
-Market widgets and persistent paper portfolio views require dedicated backend endpoints before they can display real data.
+Enter the API URL and AYU_API_KEY, then connect. The API key is kept only in current browser memory and is not written to localStorage.

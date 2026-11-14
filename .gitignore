@@ -1,8 +1,9 @@
-.env
 __pycache__/
-*.pyc
-logs/
-data/
+*.py[cod]
+.venv/
 venv/
-.DS_Store
-config.yaml
+.env
+*.log
+.pytest_cache/
+.coverage
+htmlcov/

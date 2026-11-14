@@ -1,54 +1,19 @@
-from datetime import datetime, timezone
+import unittest
 
-import pytest
-
-from ayuai.market_data.models import MarketCandle, MarketDataError, MarketSnapshot
-from ayuai.market_data.service import MarketDataService
+from core.market_data import CCXTMarketDataProvider
 
 
-def test_valid_snapshot():
-    snapshot = MarketSnapshot(
-        symbol="BTC/USDT",
-        market_type="crypto",
-        source="test",
-        fetched_at=datetime.now(timezone.utc),
-        last_price=100.0,
-        bid=99.0,
-        ask=101.0,
-    )
-    snapshot.validate()
+class MarketDataTests(unittest.TestCase):
+    def test_normalizes_and_sorts_candles(self):
+        rows = [[2000, 2, 3, 1, 2, 10], [1000, 1, 2, 0.5, 1, 20]]
+        frame = CCXTMarketDataProvider._normalize(rows)
+        self.assertEqual(len(frame), 2)
+        self.assertLess(frame["timestamp"].iloc[0], frame["timestamp"].iloc[1])
+
+    def test_rejects_invalid_price(self):
+        with self.assertRaises(RuntimeError):
+            CCXTMarketDataProvider._normalize([[1000, 1, 1, 1, 0, 1]])
 
 
-def test_invalid_bid_ask_is_rejected():
-    snapshot = MarketSnapshot(
-        symbol="BTC/USDT",
-        market_type="crypto",
-        source="test",
-        fetched_at=datetime.now(timezone.utc),
-        last_price=100.0,
-        bid=102.0,
-        ask=101.0,
-    )
-    with pytest.raises(MarketDataError):
-        snapshot.validate()
-
-
-def test_invalid_candle_is_rejected():
-    candle = MarketCandle(
-        timestamp=datetime.now(timezone.utc),
-        open=100.0,
-        high=90.0,
-        low=80.0,
-        close=95.0,
-        volume=1.0,
-    )
-    with pytest.raises(MarketDataError):
-        candle.validate()
-
-
-def test_close_extraction():
-    candles = [
-        MarketCandle(datetime.now(timezone.utc), 1, 2, 1, 1.5, 10),
-        MarketCandle(datetime.now(timezone.utc), 1.5, 3, 1, 2.5, 20),
-    ]
-    assert MarketDataService.closes(candles) == [1.5, 2.5]
+if __name__ == "__main__":
+    unittest.main()

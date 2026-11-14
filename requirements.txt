@@ -18,6 +18,9 @@ textual
 loguru
 pydantic
 typing-extensions
+fastapi
+uvicorn[standard]
+pytest
 openai
 anthropic
 google-genai
@@ -26,8 +29,6 @@ asyncpg
 aiosqlite
 cryptography
 pytest-asyncio
-fastapi
-uvicorn
 alembic
 celery[redis]
 redis
