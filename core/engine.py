@@ -61,15 +61,22 @@ class TradingEngine:
                 
                 sentiment_score = await sentiment_task
                 
-                # 3. Signal Fusion via Aggregator
-                consensus = await self.aggregator.get_consensus_signal()
-                fused_score = (consensus['score'] + sentiment_score + tech_score) / 3
-                
-                logger.debug(f"Signal Fusion | Consensus: {fused_score:.4f} | Confidence: {consensus['confidence']:.2f}")
+                # 3. Deterministic signal fusion using the actual analysis outputs.
+                consensus = await self.aggregator.get_consensus_signal({
+                    "technical": float(tech_score),
+                    "sentiment": float(sentiment_score),
+                })
+                fused_score = consensus["score"]
+
+                logger.debug(
+                    f"Signal Fusion | Score: {fused_score:.4f} | "
+                    f"Confidence: {consensus['confidence']:.2f} | "
+                    f"Technical: {tech_score:.4f} | Sentiment: {sentiment_score:.4f}"
+                )
 
                 # 4. Risk-Adjusted Execution
                 if self.risk_manager.validate_signal({"score": fused_score, "confidence": consensus['confidence']}):
-                    side = "buy" if fused_score > 0.4 else "sell" if fused_score < -0.4 else None
+                    side = "buy" if consensus["action"] == "BUY" else "sell" if consensus["action"] == "SELL" else None
                     if side:
                         await self.bridge.execute_order("binance", "BTC/USDT", side, 0.001)
 
