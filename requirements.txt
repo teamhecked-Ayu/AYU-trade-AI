@@ -27,3 +27,5 @@ pytest-asyncio
 fastapi
 uvicorn
 alembic
+celery[redis]
+redis
