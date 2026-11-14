@@ -1,38 +1,47 @@
 # AYU-trade-AI
 
-AYU-trade-AI is a production-grade, self-learning, multi-strategy execution engine designed for 24/7 autonomous warfare in the crypto and equity markets.
+AYU-trade-AI is an experimental Python trading-analysis engine with real market-data ingestion, technical indicators, sentiment analysis, deterministic signal aggregation, risk checks, and paper trading.
 
-## 🚀 Stability Verified
-The engine has been rigorously tested in a sandbox environment. Core functionalities including **FinBERT Sentiment Fusion**, **TA-Lib Technical Analysis**, and the **Kalman Filter Signal Aggregator** are confirmed stable and operational.
+## Current capabilities
 
-## Key Features
-- **Real-time Data Processing**: Processes terabytes of live data across 20+ exchanges.
-- **Deep AI Sentiment Fusion**: Ensemble of FinBERT + VADER for market psychology decoding.
-- **Arbitrage Detection**: Sub-second latency for triangular and spatial arbitrage.
-- **Advanced Technical Indicators**: 50+ indicators via TA-Lib on tick-level streaming.
-- **Institutional Precision**: Aggregates order-book depth, funding rates, and open interest.
-- **Professional Risk Management**: Kelly Criterion, trailing stops, and daily loss limits.
-- **Stylish Dashboard**: Interactive CLI UI built with `Rich` for real-time monitoring.
+- CCXT-based OHLCV market data
+- Pluggable sentiment data provider
+- Technical and sentiment signal aggregation
+- Deterministic risk validation
+- In-memory paper portfolio with trades, positions, cash, and equity calculation
+- Minimal FastAPI health and paper-trading API
+- Automated test workflow
+- Docker development deployment
 
-## 🚀 Quick Start
-For detailed OS-specific instructions (Linux, macOS, Windows), see [INSTALL.md](docs/INSTALL.md).
+## Safety model
 
-1. **Clone & Setup**:
-   ```bash
-   git clone https://github.com/teamhecked-Ayu/AYU-trade-AI.git
-   cd AYU-trade-AI
-   python -m venv venv && source venv/bin/activate
-   pip install -r requirements.txt
-   ```
-2. **Launch the Oracle**:
-   - **Interactive Dashboard**: `python cli.py --mode interactive`
-   - **Headless Daemon**: `python cli.py --mode daemon`
+Paper trading is enabled by default. This repository does not claim profitable trading performance. Historical tests, simulated results, and AI signals are not guarantees of future outcomes.
+
+## Quick start
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python -m unittest discover -s tests
+uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+Health check: `GET /health`
 
 ## Architecture
-- **Language**: Python 3.11+
-- **Concurrency**: Asyncio & WebSockets
-- **Decision Layer**: Ensemble signal aggregator with Kalman filtering.
-- **Broker Bridge**: CCXT integration for 20+ exchanges and KiteConnect for equity.
 
-## License
-MIT
+```text
+Market Data ─┐
+             ├─> Technical + Sentiment Signals
+News Data ───┘              ↓
+                     Signal Aggregator
+                            ↓
+                       Risk Manager
+                            ↓
+                    Paper Portfolio/API
+```
+
+## Known limitations
+
+The current paper portfolio is in-memory and is not persistent. Live exchange execution requires explicit credentials and additional production hardening.
