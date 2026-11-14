@@ -14,7 +14,7 @@ from utils.logging_config import configure_logging
 configure_logging()
 logger = logging.getLogger("ayu_trade_ai.api")
 
-app = FastAPI(title="AYU Trade AI API", version="0.1.0")
+app = FastAPI(title="AYU Trade AI Paper API", version="0.1.0")
 API_KEY = os.getenv("AYU_API_KEY")
 _rate_state = {}
 store = SQLitePortfolioStore(os.getenv("PAPER_PORTFOLIO_DB", "data/paper_portfolio.db"))

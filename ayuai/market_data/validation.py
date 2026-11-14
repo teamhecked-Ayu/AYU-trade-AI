@@ -11,7 +11,7 @@ class SnapshotProvider(Protocol):
 
 
 class ValidatedMarketDataService:
-    """Fetches validated market data and falls back when a source fails or is stale."""
+    """Fetch validated market data and fall back when a source fails or is stale."""
 
     def __init__(
         self,
@@ -21,6 +21,10 @@ class ValidatedMarketDataService:
         max_age_seconds: int = 120,
         max_price_difference_ratio: float = 0.10,
     ) -> None:
+        if max_age_seconds < 0:
+            raise ValueError("max_age_seconds cannot be negative")
+        if not 0 <= max_price_difference_ratio < 1:
+            raise ValueError("max_price_difference_ratio must be between 0 and 1")
         self.primary = primary
         self.fallback = fallback
         self.max_age = timedelta(seconds=max_age_seconds)
@@ -36,23 +40,21 @@ class ValidatedMarketDataService:
             raise MarketDataError("Market data is stale.")
 
     def snapshot(self, symbol: str) -> MarketSnapshot:
-        primary_error: Exception | None = None
-        primary_snapshot: MarketSnapshot | None = None
         try:
             primary_snapshot = self.primary.fetch_snapshot(symbol)
             self._validate_freshness(primary_snapshot)
-        except Exception as exc:
-            primary_error = exc
-
-        if primary_snapshot is not None:
             return primary_snapshot
-
-        if self.fallback is None:
-            raise MarketDataError("No validated market data source is available.") from primary_error
+        except Exception as primary_error:
+            if self.fallback is None:
+                raise MarketDataError(
+                    "No validated market data source is available."
+                ) from primary_error
 
         try:
             fallback_snapshot = self.fallback.fetch_snapshot(symbol)
             self._validate_freshness(fallback_snapshot)
             return fallback_snapshot
         except Exception as fallback_error:
-            raise MarketDataError("No validated market data source is available.") from fallback_error
+            raise MarketDataError(
+                "No validated market data source is available."
+            ) from fallback_error
