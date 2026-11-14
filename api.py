@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Header, Request
 import time
 import hmac
+import logging
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -8,6 +9,10 @@ from core.paper_portfolio import PaperPortfolio
 from core.portfolio_store import SQLitePortfolioStore
 import os
 from utils.health import HealthState
+from utils.logging_config import configure_logging
+
+configure_logging()
+logger = logging.getLogger("ayu_trade_ai.api")
 
 app = FastAPI(title="AYU Trade AI API", version="0.1.0")
 API_KEY = os.getenv("AYU_API_KEY")
@@ -29,6 +34,13 @@ async def health():
     return {**health_state.snapshot(), "mode": "paper"}
 
 
+@app.get("/ready")
+async def ready():
+    if not API_KEY:
+        raise HTTPException(status_code=503, detail="API key is not configured")
+    return {"status": "ready", "mode": "paper"}
+
+
 @app.get("/metrics")
 async def metrics(x_api_key: str | None = Header(default=None)):
     await require_api_key(x_api_key)
@@ -48,7 +60,7 @@ async def require_api_key(x_api_key: str | None = Header(default=None)):
 
 @app.middleware("http")
 async def rate_limit(request: Request, call_next):
-    if request.url.path == "/health":
+    if request.url.path in {"/health", "/ready"}:
         return await call_next(request)
     client = request.client.host if request.client else "unknown"
     now = time.time()
@@ -57,7 +69,15 @@ async def rate_limit(request: Request, call_next):
         return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
     hits.append(now)
     _rate_state[client] = hits
-    return await call_next(request)
+    try:
+        response = await call_next(request)
+        health_state.mark_success()
+        logger.info("%s %s %s", request.method, request.url.path, response.status_code)
+        return response
+    except Exception as exc:
+        health_state.mark_error(exc)
+        logger.exception("Unhandled API error on %s %s", request.method, request.url.path)
+        raise
 
 
 @app.get("/portfolio")
@@ -78,6 +98,7 @@ async def paper_order(order: PaperOrder, x_api_key: str | None = Header(default=
             order.symbol, order.side.lower(), order.quantity, order.price
         )
         store.save(portfolio)
+        logger.info("paper_order symbol=%s side=%s quantity=%s price=%s", order.symbol, order.side, order.quantity, order.price)
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
