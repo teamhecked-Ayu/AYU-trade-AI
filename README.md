@@ -45,3 +45,16 @@ News Data ───┘              ↓
 ## Known limitations
 
 Paper portfolio state is persisted locally with SQLite. Live exchange execution requires explicit credentials and additional production hardening. Protected API endpoints require an `AYU_API_KEY`; keep the key in environment configuration and do not expose it in source control.
+
+
+## Deployment checks
+
+Before deployment:
+
+- Set a strong `AYU_API_KEY` in a local environment file or secret manager.
+- Keep `PAPER_TRADE=true` for controlled paper-trading deployments.
+- Run `python -m pytest tests -q`.
+- Start with Docker using `docker compose up --build`.
+- Use `GET /health` for liveness and `GET /ready` for deployment readiness.
+
+The SQLite database is mounted as persistent local storage in the Docker Compose setup. Back up the `data/` directory before upgrades.
