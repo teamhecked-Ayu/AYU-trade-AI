@@ -8,13 +8,17 @@ from ayuai.database.repositories_users import UserRepository
 from ayuai.security.auth import AuthenticationError, issue_token, verify_token
 from ayuai.security.audit import AuditEvent
 from ayuai.security.rate_limit import RateLimit, RateLimiter
+from ayuai.jobs.analysis import get_analysis_job, submit_analysis
 
-app = FastAPI(title="AYUAI API", version="0.3.0")
+app = FastAPI(title="AYUAI API", version="0.4.0")
 auth_limiter = RateLimiter(RateLimit(requests=10, window_seconds=60))
 
 class Credentials(BaseModel):
     username: str = Field(min_length=3, max_length=64)
     password: str = Field(min_length=10, max_length=256)
+
+class AnalysisRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=10000)
 
 async def get_session():
     async with SessionLocal() as session:
@@ -67,3 +71,16 @@ async def login(request: Request, credentials: Credentials, session: AsyncSessio
 @app.get("/auth/me")
 async def me(user_id: str = Depends(current_user)):
     return {"user_id": user_id}
+
+
+@app.post("/analysis", status_code=202)
+async def create_analysis(payload: AnalysisRequest, user_id: str = Depends(current_user)):
+    job = submit_analysis(payload.question, user_id)
+    AuditEvent("analysis_submitted", user_id=user_id, status="queued").write()
+    return {"job_id": job.job_id, "state": job.state}
+
+
+@app.get("/analysis/{job_id}")
+async def analysis_status(job_id: str, user_id: str = Depends(current_user)):
+    job = get_analysis_job(job_id)
+    return {"job_id": job.job_id, "state": job.state, "result": job.result}
