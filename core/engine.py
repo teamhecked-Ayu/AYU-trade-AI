@@ -105,4 +105,9 @@ class TradingEngine:
                 await self._loop_task
             except asyncio.CancelledError:
                 pass
+        close = getattr(self.market_data, "close", None)
+        if close:
+            result = close()
+            if hasattr(result, "__await__"):
+                await result
         logger.warning("Trading Oracle Disengaged.")
