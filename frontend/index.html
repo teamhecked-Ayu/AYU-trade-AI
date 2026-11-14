@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AYUAI Dashboard</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header><div><span class="eyebrow">AYU TRADE AI</span><h1>Decision Dashboard</h1></div><button id="logout">Log out</button></header>
+    <section id="authCard" class="card auth">
+      <h2>Connect to AYUAI</h2>
+      <input id="apiBase" value="http://localhost:8000" aria-label="API base URL" />
+      <input id="username" placeholder="Username" autocomplete="username" />
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+      <div><button id="login">Log in</button><button class="secondary" id="register">Register</button></div>
+      <p id="authMessage"></p>
+    </section>
+    <div id="dashboard" hidden>
+      <section class="grid stats">
+        <article class="card"><span>API</span><strong id="health">Checking…</strong></article>
+        <article class="card"><span>Analysis</span><strong id="jobState">Idle</strong></article>
+        <article class="card"><span>Providers</span><strong id="providers">—</strong></article>
+      </section>
+      <section class="grid main-grid">
+        <article class="card ask">
+          <span class="eyebrow">ASK AYUAI</span><h2>Market analysis</h2>
+          <textarea id="question" placeholder="Example: Analyze BTC/USDT and explain the current risk factors."></textarea>
+          <button id="analyze">Start analysis</button>
+          <p id="analysisMessage"></p>
+        </article>
+        <article class="card result">
+          <span class="eyebrow">LATEST RESULT</span><pre id="result">No analysis yet.</pre>
+        </article>
+      </section>
+      <section class="grid">
+        <article class="card"><span class="eyebrow">PAPER PORTFOLIO</span><h2>Simulation layer ready</h2><p>Portfolio API integration is the next dashboard expansion.</p></article>
+        <article class="card"><span class="eyebrow">MARKET DATA</span><h2>Validated data layer ready</h2><p>Live market widgets will connect when market endpoints are exposed.</p></article>
+      </section>
+    </div>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
