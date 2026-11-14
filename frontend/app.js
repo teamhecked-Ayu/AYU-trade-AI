@@ -43,17 +43,39 @@ $("analyze").onclick = async () => {
     poll(job.job_id);
   } catch (error) { $("analysisMessage").textContent = error.message; }
 };
-function poll(jobId) {
+async function streamJob(jobId) {
   clearInterval(pollTimer);
-  pollTimer = setInterval(async () => {
+  try {
+    const response = await fetch(base() + "/analysis/" + encodeURIComponent(jobId) + "/events", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (!response.ok || !response.body) throw new Error("Live updates unavailable");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop();
+      for (const event of events) {
+        const line = event.split("\n").find(x => x.startsWith("data: "));
+        if (!line) continue;
+        const job = JSON.parse(line.slice(6));
+        $("jobState").textContent = job.state;
+        if (job.result !== null && job.result !== undefined) {
+          $("result").textContent = typeof job.result === "string" ? job.result : JSON.stringify(job.result, null, 2);
+        }
+      }
+    }
+  } catch (error) {
+    $("analysisMessage").textContent = "Live connection lost. Checking final status…";
     try {
       const job = await api("/analysis/" + encodeURIComponent(jobId));
       $("jobState").textContent = job.state;
-      if (job.result !== null && job.result !== undefined) {
-        $("result").textContent = typeof job.result === "string" ? job.result : JSON.stringify(job.result, null, 2);
-      }
-      if (["completed","failed","success"].includes(String(job.state).toLowerCase())) clearInterval(pollTimer);
-    } catch (error) { $("analysisMessage").textContent = error.message; clearInterval(pollTimer); }
-  }, 2000);
+      if (job.result !== null && job.result !== undefined) $("result").textContent = JSON.stringify(job.result, null, 2);
+    } catch (_) {}
+  }
 }
 if (token) showDashboard();
