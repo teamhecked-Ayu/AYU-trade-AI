@@ -10,4 +10,15 @@ beautifulsoup4
 vaderSentiment
 loguru
 pytest
+pytest-asyncio
 httpx<0.28
+
+# AYUAI integration dependencies
+sqlalchemy
+aiosqlite
+cryptography
+redis
+celery
+openai
+anthropic
+google-genai
