@@ -19,6 +19,8 @@ loguru
 pydantic
 typing-extensions
 openai
+anthropic
+google-genai
 sqlalchemy
 asyncpg
 aiosqlite
