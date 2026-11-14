@@ -3,10 +3,10 @@ import os
 from kiteconnect import KiteConnect
 
 class BrokerBridge:
-    def __init__(self):
+    def __init__(self, paper_trade=None):
         self.crypto_exchanges = {}
         self.equity_broker = None
-        self.paper_trade = os.getenv("PAPER_TRADE", "true").lower() == "true"
+        self.paper_trade = (os.getenv("PAPER_TRADE", "true").lower() == "true") if paper_trade is None else bool(paper_trade)
 
     async def init_crypto_exchange(self, exchange_id, api_key, secret):
         if exchange_id in ccxt.exchanges:
@@ -26,7 +26,7 @@ class BrokerBridge:
         """Executes order on Crypto Exchange or Equity Broker"""
         if self.paper_trade:
             print(f"[PAPER TRADE] {side.upper()} {amount} {symbol} on {exchange_id}")
-            return {"status": "success", "order_id": "paper_12345"}
+            return {"status": "paper", "order_id": None, "exchange": exchange_id, "symbol": symbol, "side": side, "amount": amount}
 
         if exchange_id in self.crypto_exchanges:
             exchange = self.crypto_exchanges[exchange_id]
