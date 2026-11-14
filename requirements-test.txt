@@ -14,7 +14,7 @@ pytest-asyncio
 httpx<0.28
 
 # AYUAI integration dependencies
-sqlalchemy
+sqlalchemy[asyncio]
 aiosqlite
 cryptography
 redis

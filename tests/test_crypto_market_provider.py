@@ -23,7 +23,7 @@ class BrokenExchange:
 
 
 def test_real_provider_normalizes_snapshot_and_history():
-    provider = CCXTMarketDataProvider(exchange="fake", exchange=FakeExchange())
+    provider = CCXTMarketDataProvider(exchange_id="fake", exchange=FakeExchange())
     snapshot = provider.fetch_snapshot("BTC/USDT")
     candles = provider.fetch_ohlcv("BTC/USDT", limit=2)
 
@@ -34,7 +34,7 @@ def test_real_provider_normalizes_snapshot_and_history():
 
 
 def test_provider_hides_internal_network_error_details():
-    provider = CCXTMarketDataProvider(exchange="fake", exchange=BrokenExchange())
+    provider = CCXTMarketDataProvider(exchange_id="fake", exchange=BrokenExchange())
     with pytest.raises(MarketDataError) as error:
         provider.fetch_snapshot("BTC/USDT")
     assert "network details" not in str(error.value)
