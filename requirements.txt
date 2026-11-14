@@ -31,3 +31,4 @@ uvicorn
 alembic
 celery[redis]
 redis
+httpx
