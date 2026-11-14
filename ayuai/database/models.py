@@ -1,0 +1,39 @@
+from __future__ import annotations
+from datetime import datetime, timezone
+from sqlalchemy import String, Float, DateTime, Text
+from sqlalchemy.orm import Mapped, mapped_column
+from .connection import Base
+
+class UserModel(Base):
+    __tablename__ = "users"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+class DecisionModel(Base):
+    __tablename__ = "decisions"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(128), index=True)
+    question: Mapped[str] = mapped_column(Text)
+    action: Mapped[str] = mapped_column(String(32))
+    confidence: Mapped[float] = mapped_column(Float)
+    outcome: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+class AgentPerformanceModel(Base):
+    __tablename__ = "agent_performance"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(128), index=True)
+    agent: Mapped[str] = mapped_column(String(128), index=True)
+    predictions: Mapped[int] = mapped_column(default=0)
+    correct: Mapped[int] = mapped_column(default=0)
+
+
+class ProviderCredentialModel(Base):
+    __tablename__ = "provider_credentials"
+    user_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32), primary_key=True)
+    ciphertext: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
