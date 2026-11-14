@@ -2,10 +2,10 @@ import asyncio
 from typing import List, Optional, Dict, Any
 from loguru import logger
 import pandas as pd
-import numpy as np
 from pydantic import BaseModel
 
 from core.signal_aggregator import SignalAggregator
+from core.market_data import CCXTMarketDataProvider, MarketDataProvider
 from core.risk_manager import RiskManager
 from core.arbitrage import ArbitrageEngine
 from core.broker_bridge import BrokerBridge
@@ -17,18 +17,22 @@ class EngineConfig(BaseModel):
     strategies: List[str] = ["sentiment", "technical", "arbitrage"]
     update_interval: float = 1.0
     paper_trade: bool = True
+    symbol: str = "BTC/USDT"
+    timeframe: str = "1m"
+    candle_limit: int = 100
 
 class TradingEngine:
     """
     The heart of AYU-trade-AI. Orchestrates data ingestion, 
     signal processing, and order execution.
     """
-    def __init__(self, config: Optional[EngineConfig] = None):
+    def __init__(self, config: Optional[EngineConfig] = None, market_data: Optional[MarketDataProvider] = None):
         self.config = config or EngineConfig()
         self.aggregator = SignalAggregator()
         self.risk_manager = RiskManager()
         self.bridge = BrokerBridge()
         self.sentiment_fusion = SentimentFusion()
+        self.market_data = market_data or CCXTMarketDataProvider()
         
         self.is_running = False
         self._loop_task: Optional[asyncio.Task] = None
@@ -48,8 +52,11 @@ class TradingEngine:
                 sentiment_task = asyncio.create_task(self.sentiment_fusion.fetch_and_fuse())
                 
                 # 2. Market Analysis
-                mock_df = self._generate_mock_market_data()
-                df_with_indicators = TechnicalIndicators.compute_all(mock_df)
+                market_df = await self.market_data.fetch_ohlcv(
+                    self.config.exchanges[0], self.config.symbol,
+                    self.config.timeframe, self.config.candle_limit
+                )
+                df_with_indicators = TechnicalIndicators.compute_all(market_df)
                 tech_score = TechnicalIndicators.get_signal(df_with_indicators)
                 
                 sentiment_score = await sentiment_task
@@ -70,16 +77,6 @@ class TradingEngine:
             except Exception as e:
                 logger.error(f"Engine Failure: {e}")
                 await asyncio.sleep(5)
-
-    def _generate_mock_market_data(self) -> pd.DataFrame:
-        """Internal helper for streaming simulation."""
-        return pd.DataFrame({
-            'open': np.random.uniform(50000, 60000, 100),
-            'high': np.random.uniform(50000, 60000, 100),
-            'low': np.random.uniform(50000, 60000, 100),
-            'close': np.random.uniform(50000, 60000, 100),
-            'volume': np.random.uniform(1, 10, 100)
-        })
 
     async def start(self) -> None:
         logger.info("Starting Engine...")
