@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from core.signal_aggregator import SignalAggregator
 from core.market_data import CCXTMarketDataProvider, MarketDataProvider
+from core.sentiment_data import SentimentDataProvider
 from core.risk_manager import RiskManager
 from core.arbitrage import ArbitrageEngine
 from core.broker_bridge import BrokerBridge
@@ -17,6 +18,7 @@ class EngineConfig(BaseModel):
     strategies: List[str] = ["sentiment", "technical", "arbitrage"]
     update_interval: float = 1.0
     paper_trade: bool = True
+    sentiment_query: str = "BTC"
     symbol: str = "BTC/USDT"
     timeframe: str = "1m"
     candle_limit: int = 100
@@ -26,12 +28,12 @@ class TradingEngine:
     The heart of AYU-trade-AI. Orchestrates data ingestion, 
     signal processing, and order execution.
     """
-    def __init__(self, config: Optional[EngineConfig] = None, market_data: Optional[MarketDataProvider] = None):
+    def __init__(self, config: Optional[EngineConfig] = None, market_data: Optional[MarketDataProvider] = None, sentiment_data: Optional[SentimentDataProvider] = None):
         self.config = config or EngineConfig()
         self.aggregator = SignalAggregator()
         self.risk_manager = RiskManager()
-        self.bridge = BrokerBridge()
-        self.sentiment_fusion = SentimentFusion()
+        self.bridge = BrokerBridge(paper_trade=self.config.paper_trade)
+        self.sentiment_fusion = SentimentFusion(data_provider=sentiment_data)
         self.market_data = market_data or CCXTMarketDataProvider()
         
         self.is_running = False
@@ -49,7 +51,7 @@ class TradingEngine:
         while self.is_running:
             try:
                 # 1. Parallel Data Ingestion
-                sentiment_task = asyncio.create_task(self.sentiment_fusion.fetch_and_fuse())
+                sentiment_task = asyncio.create_task(self.sentiment_fusion.fetch_and_fuse(self.config.sentiment_query))
                 
                 # 2. Market Analysis
                 market_df = await self.market_data.fetch_ohlcv(
@@ -78,7 +80,7 @@ class TradingEngine:
                 if self.risk_manager.validate_signal({"score": fused_score, "confidence": consensus['confidence']}):
                     side = "buy" if consensus["action"] == "BUY" else "sell" if consensus["action"] == "SELL" else None
                     if side:
-                        await self.bridge.execute_order("binance", "BTC/USDT", side, 0.001)
+                        await self.bridge.execute_order(self.config.exchanges[0], self.config.symbol, side, 0.001)
 
                 await asyncio.sleep(self.config.update_interval)
             except Exception as e:
