@@ -1,6 +1,6 @@
 """AYUAI authenticated API boundary with database-backed user accounts."""
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from ayuai.database.connection import SessionLocal
@@ -9,6 +9,7 @@ from ayuai.security.auth import AuthenticationError, issue_token, verify_token
 from ayuai.security.audit import AuditEvent
 from ayuai.security.rate_limit import RateLimit, RateLimiter
 from ayuai.jobs.analysis import get_analysis_job, submit_analysis
+from ayuai.jobs.events import analysis_events
 from ayuai.database.repositories_credentials import ProviderCredentialRepository
 from ayuai.security.key_vault import KeyVault, CredentialError
 
@@ -84,6 +85,15 @@ async def create_analysis(payload: AnalysisRequest, user_id: str = Depends(curre
     job = submit_analysis(payload.question, user_id)
     AuditEvent("analysis_submitted", user_id=user_id, status="queued").write()
     return {"job_id": job.job_id, "state": job.state}
+
+
+@app.get("/analysis/{job_id}/events")
+async def analysis_event_stream(job_id: str, user_id: str = Depends(current_user)):
+    return StreamingResponse(
+        analysis_events(job_id),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/analysis/{job_id}")
