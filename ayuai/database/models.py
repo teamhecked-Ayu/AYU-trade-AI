@@ -4,6 +4,13 @@ from sqlalchemy import String, Float, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from .connection import Base
 
+class UserModel(Base):
+    __tablename__ = "users"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
 class DecisionModel(Base):
     __tablename__ = "decisions"
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
