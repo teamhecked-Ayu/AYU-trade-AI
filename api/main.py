@@ -9,6 +9,8 @@ from ayuai.security.auth import AuthenticationError, issue_token, verify_token
 from ayuai.security.audit import AuditEvent
 from ayuai.security.rate_limit import RateLimit, RateLimiter
 from ayuai.jobs.analysis import get_analysis_job, submit_analysis
+from ayuai.database.repositories_credentials import ProviderCredentialRepository
+from ayuai.security.key_vault import KeyVault, CredentialError
 
 app = FastAPI(title="AYUAI API", version="0.4.0")
 auth_limiter = RateLimiter(RateLimit(requests=10, window_seconds=60))
@@ -16,6 +18,10 @@ auth_limiter = RateLimiter(RateLimit(requests=10, window_seconds=60))
 class Credentials(BaseModel):
     username: str = Field(min_length=3, max_length=64)
     password: str = Field(min_length=10, max_length=256)
+
+class ProviderKeyRequest(BaseModel):
+    provider: str = Field(min_length=2, max_length=32)
+    api_key: str = Field(min_length=8, max_length=512)
 
 class AnalysisRequest(BaseModel):
     question: str = Field(min_length=1, max_length=10000)
@@ -84,3 +90,31 @@ async def create_analysis(payload: AnalysisRequest, user_id: str = Depends(curre
 async def analysis_status(job_id: str, user_id: str = Depends(current_user)):
     job = get_analysis_job(job_id)
     return {"job_id": job.job_id, "state": job.state, "result": job.result}
+
+
+@app.get("/providers")
+async def list_provider_keys(user_id: str = Depends(current_user), session: AsyncSession = Depends(get_session)):
+    providers = await ProviderCredentialRepository(session, KeyVault()).list_providers(user_id)
+    return {"providers": providers}
+
+
+@app.put("/providers/{provider}")
+async def store_provider_key(provider: str, payload: ProviderKeyRequest, user_id: str = Depends(current_user), session: AsyncSession = Depends(get_session)):
+    if provider.lower() != payload.provider.lower():
+        raise HTTPException(status_code=400, detail="Provider path and payload must match.")
+    try:
+        await ProviderCredentialRepository(session, KeyVault()).store(user_id, provider, payload.api_key)
+        await session.commit()
+    except (ValueError, CredentialError) as exc:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+    AuditEvent("provider_key_updated", user_id=user_id, status=provider.lower()).write()
+    return {"provider": provider.lower(), "stored": True}
+
+
+@app.delete("/providers/{provider}")
+async def delete_provider_key(provider: str, user_id: str = Depends(current_user), session: AsyncSession = Depends(get_session)):
+    deleted = await ProviderCredentialRepository(session, KeyVault()).delete(user_id, provider)
+    if deleted:
+        await session.commit()
+    return {"provider": provider.lower(), "deleted": deleted}
