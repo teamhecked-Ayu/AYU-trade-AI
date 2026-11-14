@@ -1,12 +1,14 @@
 import ccxt.async_support as ccxt
 import os
 from kiteconnect import KiteConnect
+from core.paper_portfolio import PaperPortfolio
 
 class BrokerBridge:
-    def __init__(self, paper_trade=None):
+    def __init__(self, paper_trade=None, paper_portfolio=None):
         self.crypto_exchanges = {}
         self.equity_broker = None
         self.paper_trade = (os.getenv("PAPER_TRADE", "true").lower() == "true") if paper_trade is None else bool(paper_trade)
+        self.paper_portfolio = paper_portfolio or PaperPortfolio()
 
     async def init_crypto_exchange(self, exchange_id, api_key, secret):
         if exchange_id in ccxt.exchanges:
@@ -25,8 +27,10 @@ class BrokerBridge:
     async def execute_order(self, exchange_id, symbol, side, amount, order_type="market", price=None):
         """Executes order on Crypto Exchange or Equity Broker"""
         if self.paper_trade:
-            print(f"[PAPER TRADE] {side.upper()} {amount} {symbol} on {exchange_id}")
-            return {"status": "paper", "order_id": None, "exchange": exchange_id, "symbol": symbol, "side": side, "amount": amount}
+            if price is None:
+                raise ValueError("paper trading requires a current execution price")
+            trade = self.paper_portfolio.execute(symbol, side, amount, float(price))
+            return {"status": "paper", "exchange": exchange_id, **trade}
 
         if exchange_id in self.crypto_exchanges:
             exchange = self.crypto_exchanges[exchange_id]
