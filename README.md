@@ -8,7 +8,7 @@ AYU-trade-AI is an experimental Python trading-analysis engine with real market-
 - Pluggable sentiment data provider
 - Technical and sentiment signal aggregation
 - Deterministic risk validation
-- In-memory paper portfolio with trades, positions, cash, and equity calculation
+- SQLite-persisted paper portfolio with trades, positions, cash, and equity calculation
 - Minimal FastAPI health and paper-trading API
 - Automated test workflow
 - Docker development deployment
@@ -23,7 +23,7 @@ Paper trading is enabled by default. This repository does not claim profitable t
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python -m unittest discover -s tests
+python -m pytest tests -q
 uvicorn api:app --host 0.0.0.0 --port 8000
 ```
 
@@ -44,4 +44,4 @@ News Data ───┘              ↓
 
 ## Known limitations
 
-Paper portfolio state is persisted locally with SQLite. Live exchange execution requires explicit credentials and additional production hardening. The current API has no authentication and must not be exposed publicly without an authentication layer.
+Paper portfolio state is persisted locally with SQLite. Live exchange execution requires explicit credentials and additional production hardening. Protected API endpoints require an `AYU_API_KEY`; keep the key in environment configuration and do not expose it in source control.
