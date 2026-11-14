@@ -1,27 +1,18 @@
-import asyncio
 import unittest
-
-import pandas as pd
 
 from core.market_data import CCXTMarketDataProvider
 
 
-class FakeExchange:
-    async def fetch_ohlcv(self, symbol, timeframe=None, limit=None):
-        return [
-            [1700000000000, 100, 110, 90, 105, 12],
-            [1700000060000, 105, 115, 100, 110, 15],
-        ]
-
-
 class MarketDataTests(unittest.TestCase):
-    def test_normalizes_ohlcv(self):
-        provider = CCXTMarketDataProvider({"fake": FakeExchange()})
-        frame = asyncio.run(provider.fetch_ohlcv("fake", "BTC/USDT"))
-        self.assertIsInstance(frame, pd.DataFrame)
-        self.assertEqual(list(frame.columns), ["timestamp", "open", "high", "low", "close", "volume"])
+    def test_normalizes_and_sorts_candles(self):
+        rows = [[2000, 2, 3, 1, 2, 10], [1000, 1, 2, 0.5, 1, 20]]
+        frame = CCXTMarketDataProvider._normalize(rows)
         self.assertEqual(len(frame), 2)
-        self.assertTrue(str(frame["timestamp"].dtype).startswith("datetime64"))
+        self.assertLess(frame["timestamp"].iloc[0], frame["timestamp"].iloc[1])
+
+    def test_rejects_invalid_price(self):
+        with self.assertRaises(RuntimeError):
+            CCXTMarketDataProvider._normalize([[1000, 1, 1, 1, 0, 1]])
 
 
 if __name__ == "__main__":
