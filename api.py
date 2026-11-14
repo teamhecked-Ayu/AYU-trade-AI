@@ -29,7 +29,8 @@ async def health():
 
 
 @app.get("/metrics")
-async def metrics():
+async def metrics(x_api_key: str | None = Header(default=None)):
+    await require_api_key(x_api_key)
     return {
         "trade_count": len(portfolio.trades),
         "position_count": len([p for p in portfolio.positions.values() if p.quantity != 0]),
