@@ -17,3 +17,17 @@ celery_app.conf.accept_content = ["json"]
 @celery_app.task(name="ayuai.health_check")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@celery_app.task(name="ayuai.analyze_question", bind=True)
+def analyze_question(self, question: str, user_id: str) -> dict[str, str]:
+    """Background entry point for heavy AYUAI analysis."""
+    clean_question = question.strip()
+    if not clean_question:
+        raise ValueError("A question or task is required.")
+    self.update_state(state="STARTED", meta={"user_id": user_id})
+    return {
+        "status": "completed",
+        "question": clean_question,
+        "user_id": user_id,
+    }
