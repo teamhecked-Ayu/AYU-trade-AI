@@ -3,11 +3,14 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from .base import AIProvider, ProviderResponse
+from .resilience import analyze_with_retry, classify_provider_error
 
 @dataclass
 class ProviderFailure:
     provider: str
     error: str
+    category: str = "unavailable"
+    retryable: bool = True
 
 @dataclass
 class ProviderRun:
@@ -39,7 +42,7 @@ class ProviderManager:
 
     async def _run_provider(self, provider: AIProvider, prompt: str, system_prompt: str | None):
         return await asyncio.wait_for(
-            provider.analyze(prompt, system_prompt=system_prompt),
+            analyze_with_retry(provider, prompt, system_prompt=system_prompt),
             timeout=self.timeout_seconds,
         )
 
@@ -56,7 +59,8 @@ class ProviderManager:
         failures: list[ProviderFailure] = []
         for name, result in zip(names, results):
             if isinstance(result, BaseException):
-                failures.append(ProviderFailure(provider=name, error=self._safe_error(result)))
+                failure = classify_provider_error(name, result)
+                failures.append(ProviderFailure(provider=name, error=self._safe_error(result), category=failure.category, retryable=failure.retryable))
             else:
                 responses.append(result)
         return ProviderRun(responses=responses, failures=failures)
