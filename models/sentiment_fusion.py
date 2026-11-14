@@ -3,14 +3,16 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 import numpy as np
+from core.sentiment_data import RSSSentimentDataProvider, SentimentDataProvider
 
 class SentimentFusion:
-    def __init__(self):
+    def __init__(self, data_provider: SentimentDataProvider | None = None):
         # VADER for quick rule-based sentiment
         self.vader = SentimentIntensityAnalyzer()
         self.finbert_model_name = "ProsusAI/finbert"
         self.tokenizer = None
         self.model = None
+        self.data_provider = data_provider or RSSSentimentDataProvider()
 
     def _load_finbert(self):
         if self.tokenizer is None:
@@ -50,11 +52,6 @@ class SentimentFusion:
         return np.mean(scores)
 
     async def fetch_and_fuse(self, query="crypto"):
-        """Placeholder for actual scraping from Twitter, Reddit, CryptoPanic, etc."""
-        # In production, this would use BeautifulSoup/Requests/APIs
-        mock_texts = [
-            f"Market is looking extremely bullish for {query} today!",
-            f"Regulation concerns causing fear in {query} markets.",
-            f"Institutional adoption of {query} reaches new highs."
-        ]
-        return await self.analyze_ensemble(mock_texts)
+        """Fetch real text from the configured provider and fuse sentiment."""
+        texts = await self.data_provider.fetch_texts(query)
+        return float(await self.analyze_ensemble(texts))
