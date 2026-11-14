@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models import AgentPerformanceModel, DecisionModel
 
+
 class DecisionRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -27,6 +28,7 @@ class DecisionRepository:
         resolved = [r for r in rows if r.outcome is not None]
         return {"total_decisions": len(rows), "resolved_decisions": len(resolved)}
 
+
 class AgentPerformanceRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -38,7 +40,14 @@ class AgentPerformanceRepository:
         )
         row = (await self.session.execute(stmt)).scalar_one_or_none()
         if row is None:
-            row = AgentPerformanceModel(user_id=user_id, agent=agent)
+            # SQLAlchemy column defaults are applied at INSERT time, not when
+            # the ORM object is constructed. Initialize counters before +=.
+            row = AgentPerformanceModel(
+                user_id=user_id,
+                agent=agent,
+                predictions=0,
+                correct=0,
+            )
             self.session.add(row)
         row.predictions += 1
         row.correct += int(correct)
