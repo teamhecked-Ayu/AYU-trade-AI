@@ -1,4 +1,4 @@
-"""Runs independent providers concurrently and isolates individual provider failures."""
+"""Runs independent providers concurrently with timeouts and failure isolation."""
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
@@ -15,7 +15,10 @@ class ProviderRun:
     failures: list[ProviderFailure]
 
 class ProviderManager:
-    def __init__(self) -> None:
+    def __init__(self, timeout_seconds: float = 30.0) -> None:
+        if timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be greater than zero")
+        self.timeout_seconds = timeout_seconds
         self._providers: dict[str, AIProvider] = {}
 
     def register(self, provider: AIProvider) -> None:
@@ -27,17 +30,33 @@ class ProviderManager:
     def providers(self) -> tuple[str, ...]:
         return tuple(self._providers)
 
+    @staticmethod
+    def _safe_error(error: BaseException) -> str:
+        if isinstance(error, asyncio.TimeoutError):
+            return "Provider request timed out."
+        # Do not expose raw exception details, which can contain credentials or internals.
+        return f"{type(error).__name__}: provider request failed."
+
+    async def _run_provider(self, provider: AIProvider, prompt: str, system_prompt: str | None):
+        return await asyncio.wait_for(
+            provider.analyze(prompt, system_prompt=system_prompt),
+            timeout=self.timeout_seconds,
+        )
+
     async def analyze_all_detailed(self, prompt: str, *, system_prompt: str | None = None) -> ProviderRun:
         if not self._providers:
             raise RuntimeError("No AI providers are registered.")
         names = list(self._providers)
-        tasks = [self._providers[name].analyze(prompt, system_prompt=system_prompt) for name in names]
+        tasks = [
+            self._run_provider(self._providers[name], prompt, system_prompt)
+            for name in names
+        ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         responses: list[ProviderResponse] = []
         failures: list[ProviderFailure] = []
         for name, result in zip(names, results):
             if isinstance(result, BaseException):
-                failures.append(ProviderFailure(provider=name, error=str(result)))
+                failures.append(ProviderFailure(provider=name, error=self._safe_error(result)))
             else:
                 responses.append(result)
         return ProviderRun(responses=responses, failures=failures)
@@ -45,6 +64,5 @@ class ProviderManager:
     async def analyze_all(self, prompt: str, *, system_prompt: str | None = None) -> list[ProviderResponse]:
         run = await self.analyze_all_detailed(prompt, system_prompt=system_prompt)
         if not run.responses:
-            details = "; ".join(f"{item.provider}: {item.error}" for item in run.failures)
-            raise RuntimeError(f"All AI providers failed. {details}")
+            raise RuntimeError("All AI providers failed.")
         return run.responses
