@@ -11,6 +11,7 @@ from core.broker_bridge import BrokerBridge
 from indicators.custom import TechnicalIndicators
 from models.sentiment_fusion import SentimentFusion
 from ayuai.market_data import MarketDataError, MarketDataService
+from ayuai.trading_intelligence import TradingIntelligence
 
 
 class EngineConfig(BaseModel):
@@ -85,29 +86,28 @@ class TradingEngine:
 
                 sentiment_score = await sentiment_task
                 consensus = await self.aggregator.get_consensus_signal()
-                fused_score = (
-                    consensus["score"] + sentiment_score + tech_score
-                ) / 3
+                intelligence = TradingIntelligence.analyze(
+                    df_with_indicators,
+                    technical_score=tech_score,
+                    sentiment_score=sentiment_score,
+                )
+                # The deterministic intelligence layer is the market signal.
+                fused_score = intelligence.score
 
                 logger.debug(
                     f"Live signal | {self.config.symbol} | "
                     f"score={fused_score:.4f} "
-                    f"confidence={consensus['confidence']:.2f}"
+                    f"confidence={intelligence.confidence:.2f} "
+                    f"action={intelligence.action} trend={intelligence.trend}"
                 )
 
                 if self.risk_manager.validate_signal(
                     {
                         "score": fused_score,
-                        "confidence": consensus["confidence"],
+                        "confidence": intelligence.confidence,
                     }
                 ):
-                    side = (
-                        "buy"
-                        if fused_score > 0.4
-                        else "sell"
-                        if fused_score < -0.4
-                        else None
-                    )
+                    side = intelligence.action.lower() if intelligence.action != "WAIT" else None
                     if side:
                         # Real execution remains disabled in this market-data step.
                         # Step 9 will connect recommendations to paper trading first.
