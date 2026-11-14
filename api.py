@@ -2,9 +2,11 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from core.paper_portfolio import PaperPortfolio
+from utils.health import HealthState
 
 app = FastAPI(title="AYU Trade AI API", version="0.1.0")
 portfolio = PaperPortfolio()
+health_state = HealthState()
 
 
 class PaperOrder(BaseModel):
@@ -16,7 +18,7 @@ class PaperOrder(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "mode": "paper"}
+    return {**health_state.snapshot(), "mode": "paper"}
 
 
 @app.get("/portfolio")
