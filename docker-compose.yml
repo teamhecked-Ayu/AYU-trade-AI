@@ -1,0 +1,8 @@
+services:
+  ayu-trade-ai:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      PAPER_TRADE: "true"
+    restart: unless-stopped
