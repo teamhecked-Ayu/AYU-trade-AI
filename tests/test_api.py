@@ -1,3 +1,6 @@
+import os
+os.environ["AYU_API_KEY"] = "test-secret"
+
 import unittest
 from fastapi.testclient import TestClient
 
@@ -13,11 +16,16 @@ class APITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
 
+    def test_protected_endpoint_requires_key(self):
+        response = self.client.get("/portfolio")
+        self.assertEqual(response.status_code, 401)
+
     def test_rejects_invalid_paper_order(self):
-        response = self.client.post("/paper/orders", json={
-            "symbol": "BTC/USDT", "side": "buy",
-            "quantity": 0, "price": 100
-        })
+        response = self.client.post(
+            "/paper/orders",
+            headers={"X-API-Key": "test-secret"},
+            json={"symbol": "BTC/USDT", "side": "buy", "quantity": 0, "price": 100},
+        )
         self.assertEqual(response.status_code, 400)
 
 
