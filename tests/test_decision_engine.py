@@ -131,3 +131,23 @@ def test_incomplete_provider_conclusions_reduce_confidence_and_require_review():
     assert result.conclusion == "HOLD"
     assert result.confidence < 0.75
     assert result.requires_human_review is True
+
+
+def test_missing_configured_providers_reduce_confidence_and_require_review():
+    analyses = [
+        {"content": "CONCLUSION: WAIT"},
+        {"content": "CONCLUSION: WAIT"},
+    ]
+
+    result = DecisionEngine().decide(
+        analyses,
+        ReasoningReport(),
+        DebateReport(),
+        expected_provider_count=5,
+    )
+
+    assert result.conclusion == "WAIT"
+    assert result.confidence < 0.75
+    assert result.requires_human_review is True
+    assert result.status == "review_required"
+    assert any("3 configured provider(s) did not return" in item for item in result.rationale)

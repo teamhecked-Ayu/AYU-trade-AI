@@ -50,10 +50,17 @@ class DecisionEngine:
         analyses: list[dict],
         reasoning: ReasoningReport,
         debate: DebateReport,
+        *,
+        expected_provider_count: int | None = None,
     ) -> FinalDecision:
         actions = self._actions(analyses)
         counts = Counter(actions)
-        total = max(len(analyses), 1)
+        expected_count = max(
+            len(analyses),
+            expected_provider_count or 0,
+            1,
+        )
+        total = expected_count
 
         highest_count = max(counts.values(), default=0)
         leaders = [action for action, count in counts.items() if count == highest_count]
@@ -66,11 +73,14 @@ class DecisionEngine:
         contradiction_penalty = min(0.35, 0.08 * len(reasoning.contradictions))
         gap_penalty = min(0.25, 0.05 * len(reasoning.evidence_gaps))
         failure_penalty = 0.20 if debate.status == "failed" else 0.0
-        coverage_penalty = (
-            0.30 if len(actions) < 2
-            else 0.10 if len(actions) < len(analyses)
-            else 0.0
+        missing_responses = max(0, expected_count - len(analyses))
+        missing_conclusions = max(0, len(analyses) - len(actions))
+        coverage_penalty = min(
+            0.35,
+            (0.10 * missing_responses) + (0.05 * missing_conclusions),
         )
+        if len(actions) < 2:
+            coverage_penalty = max(coverage_penalty, 0.30)
         confidence = max(
             0.0,
             min(
@@ -100,12 +110,21 @@ class DecisionEngine:
         )[:10]
 
         rationale = [
-            f"{counts.get(conclusion, 0)} of {total} independent analyses supported the leading conclusion: {conclusion}.",
+            f"{counts.get(conclusion, 0)} of {total} configured providers supported the leading conclusion: {conclusion}.",
+            f"{len(analyses)} of {expected_count} configured provider(s) returned an analysis.",
             f"{len(actions)} provider(s) returned one unambiguous, labelled action conclusion.",
             f"{len(reasoning.agreements)} multi-provider agreements and {len(reasoning.contradictions)} detected contradictions were considered.",
         ]
         if debate.rounds:
             rationale.append(f"{len(debate.rounds)} adversarial debate round(s) completed.")
+        if missing_responses:
+            rationale.append(
+                f"{missing_responses} configured provider(s) did not return an analysis; confidence was reduced."
+            )
+        if missing_conclusions:
+            rationale.append(
+                f"{missing_conclusions} returned analysis/analyses did not contain an unambiguous action conclusion."
+            )
         if is_tied:
             rationale.append("The leading action signals are tied; no directional conclusion was selected.")
         elif conclusion == self.INSUFFICIENT:

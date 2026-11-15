@@ -1,6 +1,6 @@
-"""Independent analysis stage without group influence."""
+"""Independent analysis stage that preserves partial provider failures."""
 
-from ayuai.providers.provider_manager import ProviderManager
+from ayuai.providers.provider_manager import ProviderManager, ProviderRun
 from ayuai.providers.base import ProviderResponse
 
 INDEPENDENT_REASONING_PROMPT = """You are one independent analyst inside AYUAI.
@@ -30,7 +30,15 @@ class IndependentAnalysisAgent:
     def __init__(self, provider_manager: ProviderManager) -> None:
         self.provider_manager = provider_manager
 
-    async def run(self, user_task: str) -> list[ProviderResponse]:
-        return await self.provider_manager.analyze_all(
-            user_task, system_prompt=INDEPENDENT_REASONING_PROMPT
+    async def run_detailed(self, user_task: str) -> ProviderRun:
+        """Return both successful analyses and sanitized failures."""
+        return await self.provider_manager.analyze_all_detailed(
+            user_task,
+            system_prompt=INDEPENDENT_REASONING_PROMPT,
         )
+
+    async def run(self, user_task: str) -> list[ProviderResponse]:
+        result = await self.run_detailed(user_task)
+        if not result.responses:
+            raise RuntimeError("All configured AI providers failed.")
+        return result.responses

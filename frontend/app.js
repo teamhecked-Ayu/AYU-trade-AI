@@ -55,9 +55,8 @@ async function connectApi() {
 async function authenticate(mode) {
   const username = $("username").value.trim();
   const password = $("password").value;
-  const path = mode === "register" ? "/auth/register" : "/auth/login";
-  await request(path, jsonOptions({ username, password }));
   if (mode === "register") {
+    await request("/auth/register", jsonOptions({ username, password }));
     setMessage("authMessage", "Account created. Signing in...");
   }
   const login = await request("/auth/login", jsonOptions({ username, password }));
@@ -154,7 +153,9 @@ function renderDecision(result) {
   $("reviewNotice").hidden = !decision.requires_human_review;
 
   const analyses = result.analyses || [];
-  $("analysisCount").textContent = `${analyses.length} provider(s)`;
+  const failures = result.provider_failures || [];
+  const expectedCount = result.expected_provider_count || (analyses.length + failures.length);
+  $("analysisCount").textContent = `${analyses.length} of ${expectedCount} provider(s) responded`;
   const cards = $("agentResults");
   cards.replaceChildren();
   if (!analyses.length) {
@@ -168,6 +169,21 @@ function renderDecision(result) {
     const body = document.createElement("pre");
     body.className = "output";
     body.textContent = analysis.content || "No analysis text.";
+    card.append(heading, body);
+    cards.append(card);
+  }
+  for (const failure of failures) {
+    const card = document.createElement("article");
+    card.className = "agent-card unavailable";
+    const heading = document.createElement("h3");
+    heading.textContent = `${failure.provider || "Provider"} · unavailable`;
+    const body = document.createElement("p");
+    body.className = "hint";
+    body.textContent = [
+      failure.error || "No response was received.",
+      failure.category ? `Category: ${failure.category}` : "",
+      failure.retryable ? "Retry may work." : "Retry is not recommended for this error.",
+    ].filter(Boolean).join(" ");
     card.append(heading, body);
     cards.append(card);
   }
