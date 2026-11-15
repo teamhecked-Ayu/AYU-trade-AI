@@ -3,7 +3,7 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ayuai.database.connection import SessionLocal
 from ayuai.database.repositories_users import UserRepository
+from ayuai.database.repositories import DecisionRepository
 from ayuai.jobs.analysis import (
     analysis_job_belongs_to_user,
     get_analysis_job,
@@ -211,6 +212,29 @@ async def analysis_status(
     await require_analysis_job_owner(job_id, user_id, session)
     job = get_analysis_job(job_id)
     return {"job_id": job.job_id, "state": job.state, "result": job.result}
+
+
+@app.get("/decisions")
+async def decision_history(
+    limit: int = Query(default=25, ge=1, le=100),
+    user_id: str = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Return only the authenticated user's latest saved analysis decisions."""
+    rows = await DecisionRepository(session).list_recent(user_id, limit=limit)
+    return {
+        "decisions": [
+            {
+                "id": row.id,
+                "question": row.question,
+                "action": row.action,
+                "confidence": row.confidence,
+                "outcome": row.outcome,
+                "created_at": row.created_at,
+            }
+            for row in rows
+        ]
+    }
 
 
 @app.get("/providers")

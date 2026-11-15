@@ -23,6 +23,17 @@ class DecisionRepository:
         await self.session.flush()
         return row
 
+    async def list_recent(self, user_id: str, *, limit: int = 25) -> list[DecisionModel]:
+        if not 1 <= limit <= 100:
+            raise ValueError("Decision history limit must be between 1 and 100.")
+        stmt = (
+            select(DecisionModel)
+            .where(DecisionModel.user_id == user_id)
+            .order_by(DecisionModel.created_at.desc(), DecisionModel.id.desc())
+            .limit(limit)
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
     async def summary(self, user_id: str) -> dict:
         rows = (await self.session.execute(select(DecisionModel).where(DecisionModel.user_id == user_id))).scalars().all()
         resolved = [r for r in rows if r.outcome is not None]

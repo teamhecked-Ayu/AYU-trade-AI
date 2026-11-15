@@ -1,1 +1,153 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AYU Trade AI</title><link rel="stylesheet" href="styles.css"></head><body><main class="shell"><header><div><h1>AYU Trade AI</h1><p>Paper trading dashboard</p></div><span id="status" class="status">Checking API...</span></header><section class="card settings"><h2>Connection</h2><input id="apiBase" value="http://localhost:8000"><input id="apiKey" type="password" placeholder="API key"><button id="connect">Connect</button></section><section class="grid"><article class="card"><h2>Paper Cash</h2><strong id="cash">-</strong></article><article class="card"><h2>Positions</h2><strong id="positionCount">-</strong></article><article class="card"><h2>Trades</h2><strong id="tradeCount">-</strong></article></section><section class="card"><h2>Paper Order</h2><form id="orderForm"><input id="symbol" value="BTC/USDT" required><select id="side"><option value="buy">Buy</option><option value="sell">Sell</option></select><input id="quantity" type="number" min="0.00000001" step="any" placeholder="Quantity" required><input id="price" type="number" min="0.00000001" step="any" placeholder="Price" required><button type="submit">Submit Paper Order</button></form><p id="message"></p></section><section class="card"><h2>Portfolio</h2><pre id="portfolio">Connect to load portfolio.</pre></section></main><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f8">
+  <title>AYU Trade AI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">AYU INTELLIGENCE</p>
+        <h1>AYU Trade AI</h1>
+        <p class="subtle">Independent AI analysis and paper portfolio workspace</p>
+      </div>
+      <span id="status" class="status">Checking API...</span>
+    </header>
+
+    <section class="card connection settings">
+      <div class="section-heading">
+        <div><p class="eyebrow">CONNECTION</p><h2>API endpoint</h2></div>
+        <button id="connect" class="button secondary" type="button">Connect</button>
+      </div>
+      <label for="apiBase">API base URL</label>
+      <input id="apiBase" value="http://localhost:8000" autocomplete="url">
+    </section>
+
+    <section class="card" id="authCard">
+      <div class="section-heading">
+        <div><p class="eyebrow">ACCOUNT</p><h2>Sign in to AYUAI</h2></div>
+        <span id="authStatus" class="subtle">Not signed in</span>
+      </div>
+      <form id="authForm" class="form-grid">
+        <label>Username<input id="username" minlength="3" maxlength="64" autocomplete="username" required></label>
+        <label>Password<input id="password" type="password" minlength="10" maxlength="256" autocomplete="current-password" required></label>
+        <div class="button-row">
+          <button type="submit" id="loginButton">Sign in</button>
+          <button type="button" id="registerButton" class="button secondary">Create account</button>
+          <button type="button" id="logoutButton" class="button ghost" hidden>Sign out</button>
+        </div>
+      </form>
+      <p id="authMessage" class="message" role="status"></p>
+      <p class="hint">Your session token stays in this browser tab's memory. Sign in again after reloading the page.</p>
+    </section>
+
+    <section class="card" id="providerCard">
+      <div class="section-heading">
+        <div><p class="eyebrow">MODEL CONNECTIONS</p><h2>AI provider keys</h2></div>
+        <span id="providerCount" class="subtle">0 connected</span>
+      </div>
+      <p class="hint">Keys are encrypted by the API and are never shown again after saving. Add only provider keys you are authorised to use.</p>
+      <div class="form-grid provider-form">
+        <label>Provider
+          <select id="providerName">
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="gemini">Gemini</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="perplexity">Perplexity</option>
+          </select>
+        </label>
+        <label>API key<input id="providerKey" type="password" autocomplete="off" placeholder="Paste provider key"></label>
+        <div class="button-row">
+          <button id="saveProvider" type="button">Save key</button>
+          <button id="removeProvider" type="button" class="button secondary">Remove selected</button>
+        </div>
+      </div>
+      <div id="providerList" class="provider-list"><span class="hint">Sign in to view connected providers.</span></div>
+      <p id="providerMessage" class="message" role="status"></p>
+    </section>
+
+    <section class="card" id="analysisCard">
+      <div class="section-heading">
+        <div><p class="eyebrow">MULTI-AGENT WORKSPACE</p><h2>Ask AYUAI</h2></div>
+        <span class="subtle">One question, independent reviews</span>
+      </div>
+      <form id="analysisForm">
+        <label for="question">Question or research task</label>
+        <textarea id="question" rows="4" maxlength="10000" placeholder="Ask a research question or request an explanation..." required></textarea>
+        <div class="button-row">
+          <button id="analyseButton" type="submit">Start analysis</button>
+          <span id="jobStatus" class="hint" role="status"></span>
+        </div>
+      </form>
+      <p class="disclaimer">AI output can be wrong or incomplete. It is for information and education, not financial advice. Analysis does not place an order.</p>
+    </section>
+
+    <section id="results" class="results" hidden>
+      <article class="card decision-card">
+        <p class="eyebrow">SYNTHESISED RESULT</p>
+        <div class="decision-row">
+          <h2 id="decisionTitle">Waiting for analysis</h2>
+          <span id="confidence" class="confidence">-</span>
+        </div>
+        <p id="decisionStatus" class="subtle"></p>
+        <ul id="decisionRationale" class="plain-list"></ul>
+        <div id="riskBlock" class="detail-block" hidden>
+          <h3>Key risks</h3><ul id="riskList" class="plain-list"></ul>
+        </div>
+        <div id="reviewNotice" class="notice" hidden>Human review is required. Do not treat this result as an instruction to trade.</div>
+      </article>
+      <section class="card">
+        <div class="section-heading"><div><p class="eyebrow">INDEPENDENT REVIEWS</p><h2>Provider analyses</h2></div><span id="analysisCount" class="subtle"></span></div>
+        <div id="agentResults" class="agent-list"></div>
+      </section>
+      <section class="card">
+        <p class="eyebrow">CROSS-CHECK</p><h2>Reasoning map</h2>
+        <pre id="reasoningOutput" class="output"></pre>
+      </section>
+      <section class="card">
+        <p class="eyebrow">ADVERSARIAL REVIEW</p><h2>Debate summary</h2>
+        <pre id="debateOutput" class="output"></pre>
+      </section>
+    </section>
+
+    <section class="card" id="historyCard">
+      <div class="section-heading">
+        <div><p class="eyebrow">SAVED RESULTS</p><h2>Analysis history</h2></div>
+        <button id="refreshHistory" class="button secondary" type="button">Refresh</button>
+      </div>
+      <div id="historyList" class="history-list"><p class="hint">Sign in to load saved results.</p></div>
+    </section>
+
+    <section class="card">
+      <div class="section-heading"><div><p class="eyebrow">PAPER MODE</p><h2>Paper portfolio</h2></div><span class="subtle">Simulated only</span></div>
+      <div class="connection settings">
+        <label for="apiKey">AYU API key</label>
+        <input id="apiKey" type="password" autocomplete="off" placeholder="Paper API key">
+        <button id="connectPaper" class="button secondary" type="button">Connect portfolio</button>
+      </div>
+      <div class="grid">
+        <article class="metric"><h3>Paper cash</h3><strong id="cash">-</strong></article>
+        <article class="metric"><h3>Positions</h3><strong id="positionCount">-</strong></article>
+        <article class="metric"><h3>Trades</h3><strong id="tradeCount">-</strong></article>
+      </div>
+      <form id="orderForm" class="paper-form">
+        <h3>Manual paper order</h3>
+        <input id="symbol" value="BTC/USDT" aria-label="Symbol" required>
+        <select id="side" aria-label="Order side"><option value="buy">Buy</option><option value="sell">Sell</option></select>
+        <input id="quantity" type="number" min="0.00000001" step="any" placeholder="Quantity" aria-label="Quantity" required>
+        <input id="price" type="number" min="0.00000001" step="any" placeholder="Price" aria-label="Price" required>
+        <button type="submit">Submit paper order</button>
+      </form>
+      <p id="paperMessage" class="message" role="status"></p>
+      <details><summary>Portfolio data</summary><pre id="portfolio" class="output">Connect the paper portfolio to load details.</pre></details>
+    </section>
+    <footer class="footer">Paper mode only. AYUAI analysis never sends orders to a broker.</footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

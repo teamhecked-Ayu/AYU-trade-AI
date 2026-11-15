@@ -8,6 +8,7 @@ import uuid
 from celery import Celery
 
 from ayuai.jobs.queue import REDIS_URL
+from ayuai.jobs.serialization import serialize_analysis_result
 
 celery_app = Celery("ayuai", broker=REDIS_URL, backend=REDIS_URL)
 celery_app.conf.task_track_started = True
@@ -68,18 +69,6 @@ def analyze_question(self, question: str, user_id: str) -> dict:
         manager = build_provider_manager(keys)
         result = await AYUAIOrchestrator(manager).analyze(clean_question, user_id=user_id)
         await persist_decision(result, user_id)
-        decision = result.decision
-
-        return {
-            "status": "completed",
-            "stage": result.stage,
-            "question": result.question,
-            "decision_id": result.decision_id,
-            "decision": {
-                "conclusion": decision.conclusion if decision else None,
-                "confidence": decision.confidence if decision else None,
-            },
-            "provider_count": len(result.analyses),
-        }
+        return serialize_analysis_result(result)
 
     return asyncio.run(run_pipeline())
