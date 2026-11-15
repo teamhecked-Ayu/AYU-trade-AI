@@ -4,7 +4,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://ayuai:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/ayuai
+      DATABASE_URL: postgresql+asyncpg://ayuai:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/ayuai
     command: ["alembic", "upgrade", "head"]
     depends_on:
       postgres:
@@ -19,7 +19,7 @@ services:
       - .env
     environment:
       PAPER_TRADE: "true"
-      DATABASE_URL: postgresql+asyncpg://ayuai:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/ayuai
+      DATABASE_URL: postgresql+asyncpg://ayuai:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/ayuai
       REDIS_URL: redis://redis:6379/0
       AYUAI_RATE_LIMIT_BACKEND: redis
     volumes:
@@ -32,6 +32,16 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3).read()"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   celery-worker:
     build: .
@@ -39,7 +49,7 @@ services:
       - .env
     environment:
       PAPER_TRADE: "true"
-      DATABASE_URL: postgresql+asyncpg://ayuai:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/ayuai
+      DATABASE_URL: postgresql+asyncpg://ayuai:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/ayuai
       REDIS_URL: redis://redis:6379/0
     command: ["celery", "-A", "ayuai.jobs.tasks:celery_app", "worker", "--loglevel=INFO"]
     depends_on:
@@ -56,7 +66,7 @@ services:
     environment:
       POSTGRES_DB: ayuai
       POSTGRES_USER: ayuai
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
