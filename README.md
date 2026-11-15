@@ -26,7 +26,7 @@ AYU Trade AI is a Python-based research and paper-trading project. It combines a
 - CCXT-based market data and historical candle validation.
 - Optional secondary market-data provider for validated fallback and cross-source comparison.
 - Technical and sentiment signals, deterministic risk checks, and backtesting modules.
-- One SQLite-backed paper portfolio shared by the API, broker bridge's paper mode, and AYUAI paper-trading facade.
+- One SQLite-backed paper portfolio shared by the API, broker bridge's paper mode, and AYUAI paper-trading facade (persistent by default; in-memory mode is explicit for isolated tests).
 - Portfolio orders are committed atomically to avoid stale in-memory writes.
 
 ## System layout
