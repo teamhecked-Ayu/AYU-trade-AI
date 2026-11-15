@@ -33,6 +33,7 @@ async def lifespan(_: FastAPI):
     finally:
         await redis_auth_limiter.close()
         await redis_api_limiter.close()
+        await redis_paper_limiter.close()
 
 
 app = FastAPI(title="AYUAI API", version="0.4.0", lifespan=lifespan)
@@ -60,6 +61,7 @@ app.add_middleware(
 # calls get a separate allowance so dashboard polling does not block itself.
 AUTH_RATE_LIMIT = RateLimit(requests=10, window_seconds=60)
 API_RATE_LIMIT = RateLimit(requests=120, window_seconds=60)
+PAPER_RATE_LIMIT = RateLimit(requests=60, window_seconds=60)
 RATE_LIMIT_BACKEND = os.getenv("AYUAI_RATE_LIMIT_BACKEND", "memory").strip().lower()
 if RATE_LIMIT_BACKEND not in {"memory", "redis"}:
     raise RuntimeError("AYUAI_RATE_LIMIT_BACKEND must be 'memory' or 'redis'.")
@@ -69,6 +71,8 @@ api_limiter = RateLimiter(API_RATE_LIMIT)
 redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_auth_limiter = RedisRateLimiter(redis_url, AUTH_RATE_LIMIT)
 redis_api_limiter = RedisRateLimiter(redis_url, API_RATE_LIMIT)
+paper_limiter = RateLimiter(PAPER_RATE_LIMIT)
+redis_paper_limiter = RedisRateLimiter(redis_url, PAPER_RATE_LIMIT)
 
 
 class Credentials(BaseModel):
@@ -96,13 +100,17 @@ def client_key(request: Request) -> str:
 
 async def enforce_rate_limit(request: Request, *, scope: str = "api") -> None:
     """Apply separate shared counters for authentication and normal API traffic."""
-    if scope not in {"auth", "api"}:
+    if scope not in {"auth", "api", "paper"}:
         raise ValueError("Unknown rate-limit scope.")
 
     ip_address = client_key(request)
     limiter_key = f"{scope}:{ip_address}"
-    memory_limiter = auth_limiter if scope == "auth" else api_limiter
-    redis_limiter = redis_auth_limiter if scope == "auth" else redis_api_limiter
+    limiters = {
+        "auth": (auth_limiter, redis_auth_limiter),
+        "api": (api_limiter, redis_api_limiter),
+        "paper": (paper_limiter, redis_paper_limiter),
+    }
+    memory_limiter, redis_limiter = limiters[scope]
 
     try:
         if RATE_LIMIT_BACKEND == "redis":
