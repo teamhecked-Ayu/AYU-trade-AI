@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from core.paper_portfolio import PaperPortfolio
+from core.paper_portfolio import PaperPortfolio, Position as PaperPosition
 from core.portfolio_store import SQLitePortfolioStore
 
 
