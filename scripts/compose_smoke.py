@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.request
 import uuid
+
+# When executed as "python scripts/compose_smoke.py", Python puts the scripts
+# directory first on sys.path. Add the project root for package imports.
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 BASE_URL = "http://127.0.0.1:8000"
 
