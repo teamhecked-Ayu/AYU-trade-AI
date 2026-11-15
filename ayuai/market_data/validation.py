@@ -11,7 +11,7 @@ class SnapshotProvider(Protocol):
 
 
 class ValidatedMarketDataService:
-    """Fetch validated market data and fall back when a source fails or is stale."""
+    """Validate freshness and use a secondary source when the primary is unsafe."""
 
     def __init__(
         self,
@@ -30,31 +30,48 @@ class ValidatedMarketDataService:
         self.max_age = timedelta(seconds=max_age_seconds)
         self.max_price_difference_ratio = max_price_difference_ratio
 
-    def _validate_freshness(self, snapshot: MarketSnapshot) -> None:
+    def _validate_freshness(self, snapshot: MarketSnapshot, symbol: str) -> None:
         snapshot.validate()
-        fetched_at = snapshot.fetched_at
-        if fetched_at.tzinfo is None:
-            raise MarketDataError("Market data timestamp must include timezone information.")
-        age = datetime.now(timezone.utc) - fetched_at
+        if snapshot.symbol != symbol:
+            raise MarketDataError("Market data provider returned a different symbol.")
+        age = datetime.now(timezone.utc) - snapshot.fetched_at
+        if age < timedelta(seconds=-30):
+            raise MarketDataError("Market data timestamp is in the future.")
         if age > self.max_age:
             raise MarketDataError("Market data is stale.")
 
     def snapshot(self, symbol: str) -> MarketSnapshot:
         try:
             primary_snapshot = self.primary.fetch_snapshot(symbol)
-            self._validate_freshness(primary_snapshot)
-            return primary_snapshot
+            self._validate_freshness(primary_snapshot, symbol)
         except Exception as primary_error:
             if self.fallback is None:
                 raise MarketDataError(
                     "No validated market data source is available."
                 ) from primary_error
+            try:
+                fallback_snapshot = self.fallback.fetch_snapshot(symbol)
+                self._validate_freshness(fallback_snapshot, symbol)
+                return fallback_snapshot
+            except Exception as fallback_error:
+                raise MarketDataError(
+                    "No validated market data source is available."
+                ) from fallback_error
 
-        try:
-            fallback_snapshot = self.fallback.fetch_snapshot(symbol)
-            self._validate_freshness(fallback_snapshot)
-            return fallback_snapshot
-        except Exception as fallback_error:
-            raise MarketDataError(
-                "No validated market data source is available."
-            ) from fallback_error
+        # If a secondary source is configured, compare it when healthy. An
+        # unavailable secondary source does not invalidate a fresh primary.
+        if self.fallback is not None:
+            try:
+                fallback_snapshot = self.fallback.fetch_snapshot(symbol)
+                self._validate_freshness(fallback_snapshot, symbol)
+            except Exception:
+                return primary_snapshot
+
+            denominator = max(primary_snapshot.last_price, fallback_snapshot.last_price)
+            difference = abs(primary_snapshot.last_price - fallback_snapshot.last_price) / denominator
+            if difference > self.max_price_difference_ratio:
+                raise MarketDataError(
+                    "Market data sources disagree beyond the configured price tolerance."
+                )
+
+        return primary_snapshot
