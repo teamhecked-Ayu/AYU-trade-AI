@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from dataclasses import asdict
 
 from celery import Celery
 
 from ayuai.jobs.queue import REDIS_URL
+from ayuai.jobs.serialization import serialize_analysis_result
 
 celery_app = Celery("ayuai", broker=REDIS_URL, backend=REDIS_URL)
 celery_app.conf.task_track_started = True
@@ -69,37 +69,6 @@ def analyze_question(self, question: str, user_id: str) -> dict:
         manager = build_provider_manager(keys)
         result = await AYUAIOrchestrator(manager).analyze(clean_question, user_id=user_id)
         await persist_decision(result, user_id)
-        decision = result.decision
-
-        debate = result.debate
-        return {
-            "status": "completed",
-            "stage": result.stage,
-            "question": result.question,
-            "decision_id": result.decision_id,
-            "decision": asdict(decision) if decision else None,
-            "provider_count": len(result.analyses),
-            "analyses": [
-                {
-                    "provider": item["provider"],
-                    "model": item["model"],
-                    "content": item["content"],
-                }
-                for item in result.analyses
-            ],
-            "reasoning": asdict(result.reasoning) if result.reasoning else None,
-            "debate": {
-                "status": debate.status,
-                "unresolved_issues": debate.unresolved_issues,
-                "minority_positions": debate.minority_positions,
-                "rounds": [
-                    {
-                        "round_number": item.round_number,
-                        "responses": item.responses,
-                    }
-                    for item in debate.rounds
-                ],
-            } if debate else None,
-        }
+        return serialize_analysis_result(result)
 
     return asyncio.run(run_pipeline())

@@ -6,7 +6,7 @@ the API contract without requiring Redis, Celery workers, or AI providers.
 
 from fastapi.testclient import TestClient
 
-from api.main import app, current_user
+from api.main import app, current_user, get_session
 from ayuai.jobs.analysis import AnalysisJob
 
 
@@ -135,7 +135,7 @@ def test_decision_history_is_scoped_to_authenticated_user(monkeypatch):
         monkeypatch.setattr("api.main.DecisionRepository", FakeRepository)
         async def fake_session():
             yield object()
-        app.dependency_overrides["api.main.get_session"] = fake_session
+        app.dependency_overrides[get_session] = fake_session
 
         response = TestClient(app).get("/decisions?limit=10")
         assert response.status_code == 200
