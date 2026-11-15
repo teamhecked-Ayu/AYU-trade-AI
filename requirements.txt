@@ -26,6 +26,7 @@ anthropic
 google-genai
 sqlalchemy
 asyncpg
+psycopg[binary]
 aiosqlite
 cryptography
 pytest-asyncio

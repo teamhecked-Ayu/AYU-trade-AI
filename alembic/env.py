@@ -1,8 +1,11 @@
 from __future__ import annotations
+
 import os
 from logging.config import fileConfig
+
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
 from ayuai.database.connection import Base
 from ayuai.database import models  # noqa: F401
 
@@ -12,10 +15,14 @@ if config.config_file_name:
 
 database_url = os.getenv("DATABASE_URL")
 if database_url:
-    config.set_main_option(
-        "sqlalchemy.url",
-        database_url.replace("+asyncpg", "").replace("+aiosqlite", ""),
+    # Alembic runs synchronously. Convert the application's async database
+    # drivers to their sync equivalents instead of relying on an undeclared
+    # default PostgreSQL driver.
+    sync_database_url = (
+        database_url.replace("+asyncpg", "+psycopg")
+        .replace("+aiosqlite", "")
     )
+    config.set_main_option("sqlalchemy.url", sync_database_url)
 
 target_metadata = Base.metadata
 
