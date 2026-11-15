@@ -15,7 +15,6 @@ configure_logging()
 logger = logging.getLogger("ayu_trade_ai.api")
 
 app = FastAPI(title="AYU Trade AI Paper API", version="0.1.0")
-API_KEY = os.getenv("AYU_API_KEY")
 _rate_state = {}
 store = SQLitePortfolioStore(os.getenv("PAPER_PORTFOLIO_DB", "data/paper_portfolio.db"))
 portfolio = store.load()
@@ -36,7 +35,7 @@ async def health():
 
 @app.get("/ready")
 async def ready():
-    if not API_KEY:
+    if not os.getenv("AYU_API_KEY"):
         raise HTTPException(status_code=503, detail="API key is not configured")
     return {"status": "ready", "mode": "paper"}
 
@@ -52,9 +51,10 @@ async def metrics(x_api_key: str | None = Header(default=None)):
 
 
 async def require_api_key(x_api_key: str | None = Header(default=None)):
-    if not API_KEY:
+    configured_api_key = os.getenv("AYU_API_KEY")
+    if not configured_api_key:
         raise HTTPException(status_code=503, detail="API key is not configured")
-    if not x_api_key or not hmac.compare_digest(x_api_key, API_KEY):
+    if not x_api_key or not hmac.compare_digest(x_api_key, configured_api_key):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
