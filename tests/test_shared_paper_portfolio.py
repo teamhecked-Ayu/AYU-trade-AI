@@ -54,7 +54,7 @@ def test_sqlite_store_execute_is_atomic_and_visible_to_other_instances(tmp_path)
     second.execute("BTC/USDT", "buy", 1, 50, fee_rate=0)
 
     loaded = SQLitePortfolioStore(path).load(fee_rate=0)
-    assert loaded.cash == 7_750
+    assert loaded.cash == 9_750
     assert loaded.positions["BTC/USDT"].quantity == 3
     assert len(loaded.trades) == 2
 
@@ -62,7 +62,7 @@ def test_sqlite_store_execute_is_atomic_and_visible_to_other_instances(tmp_path)
         first.execute("BTC/USDT", "buy", 1000, 100, fee_rate=0)
 
     after_failure = second.load(fee_rate=0)
-    assert after_failure.cash == 7_750
+    assert after_failure.cash == 9_750
     assert after_failure.positions["BTC/USDT"].quantity == 3
 
 

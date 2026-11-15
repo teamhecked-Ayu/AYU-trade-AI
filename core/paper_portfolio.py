@@ -50,7 +50,7 @@ class PaperPortfolio:
             position.quantity -= quantity
             self.cash += gross - fee
             if position.quantity == 0:
-                position.average_price = 0.0
+                self.positions.pop(symbol, None)
 
         trade = {
             "symbol": symbol,
