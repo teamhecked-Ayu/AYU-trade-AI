@@ -98,13 +98,15 @@ def test_market_service_uses_fallback_for_history_if_primary_fails():
 
 
 def test_market_service_uses_fallback_for_invalid_primary_history():
-    primary = FakeProvider(candles=[history()[0], history()[0]])
-    fallback = FakeProvider(candles=history())
+    duplicate = history()[0]
+    primary = FakeProvider(candles=[duplicate, duplicate])
+    fallback_candles = history()
+    fallback = FakeProvider(candles=fallback_candles)
     service = MarketDataService(primary, fallback)
 
     candles = service.crypto_history("BTC/USDT", "1h", 2)
 
-    assert candles == history()
+    assert [c.close for c in candles] == [105, 108]
     assert primary.history_calls == 1
     assert fallback.history_calls == 1
 
