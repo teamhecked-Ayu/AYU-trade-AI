@@ -1,4 +1,16 @@
 services:
+  migrate:
+    build: .
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ayuai:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/ayuai
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   ayu-trade-ai:
     build: .
     ports:
@@ -7,13 +19,35 @@ services:
       - .env
     environment:
       PAPER_TRADE: "true"
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ayuai:change-me-in-production@postgres:5432/ayuai}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DATABASE_URL: postgresql+asyncpg://ayuai:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/ayuai
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - ./data:/app/data
     depends_on:
-      - postgres
-      - redis
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  celery-worker:
+    build: .
+    env_file:
+      - .env
+    environment:
+      PAPER_TRADE: "true"
+      DATABASE_URL: postgresql+asyncpg://ayuai:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/ayuai
+      REDIS_URL: redis://redis:6379/0
+    command: ["celery", "-A", "ayuai.jobs.tasks:celery_app", "worker", "--loglevel=INFO"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   postgres:
@@ -26,6 +60,11 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ayuai -d ayuai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -34,6 +73,11 @@ services:
       - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   postgres_data:
