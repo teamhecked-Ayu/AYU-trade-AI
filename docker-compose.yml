@@ -21,6 +21,7 @@ services:
       PAPER_TRADE: "true"
       DATABASE_URL: postgresql+asyncpg://ayuai:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/ayuai
       REDIS_URL: redis://redis:6379/0
+      AYUAI_RATE_LIMIT_BACKEND: redis
     volumes:
       - ./data:/app/data
     depends_on:
