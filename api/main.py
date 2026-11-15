@@ -54,6 +54,7 @@ redis_auth_limiter = RedisRateLimiter(
     os.getenv("REDIS_URL", "redis://localhost:6379/0"),
     AUTH_RATE_LIMIT,
 )
+app.add_event_handler("shutdown", redis_auth_limiter.close)
 
 
 class Credentials(BaseModel):
@@ -136,7 +137,7 @@ async def register(
     credentials: Credentials,
     session: AsyncSession = Depends(get_session),
 ):
-    enforce_rate_limit(request)
+    await enforce_rate_limit(request)
     try:
         user = await UserRepository(session).create(credentials.username, credentials.password)
         await session.commit()
