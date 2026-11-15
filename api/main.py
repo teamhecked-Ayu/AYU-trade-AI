@@ -32,6 +32,7 @@ async def lifespan(_: FastAPI):
         yield
     finally:
         await redis_auth_limiter.close()
+        await redis_api_limiter.close()
 
 
 app = FastAPI(title="AYUAI API", version="0.4.0", lifespan=lifespan)
@@ -55,16 +56,19 @@ app.add_middleware(
     max_age=600,
 )
 
+# Authentication endpoints get a stricter bucket. Normal authenticated API
+# calls get a separate allowance so dashboard polling does not block itself.
 AUTH_RATE_LIMIT = RateLimit(requests=10, window_seconds=60)
+API_RATE_LIMIT = RateLimit(requests=120, window_seconds=60)
 RATE_LIMIT_BACKEND = os.getenv("AYUAI_RATE_LIMIT_BACKEND", "memory").strip().lower()
 if RATE_LIMIT_BACKEND not in {"memory", "redis"}:
     raise RuntimeError("AYUAI_RATE_LIMIT_BACKEND must be 'memory' or 'redis'.")
 
 auth_limiter = RateLimiter(AUTH_RATE_LIMIT)
-redis_auth_limiter = RedisRateLimiter(
-    os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-    AUTH_RATE_LIMIT,
-)
+api_limiter = RateLimiter(API_RATE_LIMIT)
+redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_auth_limiter = RedisRateLimiter(redis_url, AUTH_RATE_LIMIT)
+redis_api_limiter = RedisRateLimiter(redis_url, API_RATE_LIMIT)
 
 
 class Credentials(BaseModel):
@@ -90,13 +94,21 @@ def client_key(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-async def enforce_rate_limit(request: Request) -> None:
+async def enforce_rate_limit(request: Request, *, scope: str = "api") -> None:
+    """Apply separate shared counters for authentication and normal API traffic."""
+    if scope not in {"auth", "api"}:
+        raise ValueError("Unknown rate-limit scope.")
+
     ip_address = client_key(request)
+    limiter_key = f"{scope}:{ip_address}"
+    memory_limiter = auth_limiter if scope == "auth" else api_limiter
+    redis_limiter = redis_auth_limiter if scope == "auth" else redis_api_limiter
+
     try:
         if RATE_LIMIT_BACKEND == "redis":
-            allowed, retry_after = await redis_auth_limiter.check(ip_address)
+            allowed, retry_after = await redis_limiter.check(limiter_key)
         else:
-            allowed, retry_after = auth_limiter.check(ip_address)
+            allowed, retry_after = memory_limiter.check(limiter_key)
     except RateLimitBackendUnavailable as exc:
         AuditEvent("rate_limit_backend_unavailable", ip=ip_address, status="blocked").write()
         raise HTTPException(
@@ -117,7 +129,7 @@ async def current_user(
     request: Request,
     authorization: str | None = Header(default=None),
 ) -> str:
-    await enforce_rate_limit(request)
+    await enforce_rate_limit(request, scope="api")
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Authentication required")
     try:
@@ -185,7 +197,7 @@ async def register(
     credentials: Credentials,
     session: AsyncSession = Depends(get_session),
 ):
-    await enforce_rate_limit(request)
+    await enforce_rate_limit(request, scope="auth")
     try:
         user = await UserRepository(session).create(credentials.username, credentials.password)
         await session.commit()
@@ -201,7 +213,7 @@ async def login(
     credentials: Credentials,
     session: AsyncSession = Depends(get_session),
 ):
-    await enforce_rate_limit(request)
+    await enforce_rate_limit(request, scope="auth")
     user = await UserRepository(session).authenticate(credentials.username, credentials.password)
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
