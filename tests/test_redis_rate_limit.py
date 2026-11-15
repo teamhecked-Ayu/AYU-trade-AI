@@ -52,3 +52,26 @@ async def test_redis_rate_limiter_fails_closed_when_redis_is_unavailable():
 
     with pytest.raises(RateLimitBackendUnavailable):
         await limiter.check("192.0.2.10")
+
+
+@pytest.mark.asyncio
+async def test_auth_and_api_scopes_use_separate_redis_keys(monkeypatch):
+    monkeypatch.setattr("ayuai.security.redis_rate_limit.time.time", lambda: 125)
+    client = FakeRedis()
+    auth = RedisRateLimiter(
+        "redis://unused",
+        RateLimit(requests=2, window_seconds=60),
+        client=client,
+    )
+    api = RedisRateLimiter(
+        "redis://unused",
+        RateLimit(requests=120, window_seconds=60),
+        client=client,
+    )
+
+    await auth.check("auth:192.0.2.10")
+    await api.check("api:192.0.2.10")
+
+    assert client.calls[0][2] != client.calls[1][2]
+    assert client.calls[0][2].endswith("auth:192.0.2.10")
+    assert client.calls[1][2].endswith("api:192.0.2.10")
