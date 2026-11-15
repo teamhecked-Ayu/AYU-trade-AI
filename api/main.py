@@ -1,6 +1,9 @@
 """AYUAI authenticated API boundary with database-backed user accounts."""
 
+import os
+
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +23,26 @@ from ayuai.security.key_vault import KeyVault, CredentialError
 from ayuai.security.rate_limit import RateLimit, RateLimiter
 
 app = FastAPI(title="AYUAI API", version="0.4.0")
+
+# The static dashboard runs on a separate origin during local development.
+# Production deployments should add their exact frontend origins in .env.
+cors_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv(
+        "AYUAI_CORS_ORIGINS",
+        "http://localhost:8080,http://127.0.0.1:8080",
+    ).split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
+    max_age=600,
+)
+
 auth_limiter = RateLimiter(RateLimit(requests=10, window_seconds=60))
 
 

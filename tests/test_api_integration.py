@@ -75,3 +75,33 @@ def test_analysis_event_stream_contract(monkeypatch):
         assert '"state":"SUCCESS"' in response.text
     finally:
         app.dependency_overrides.clear()
+
+
+def test_cors_preflight_allows_local_dashboard():
+    client = TestClient(app)
+    response = client.options(
+        "/analysis",
+        headers={
+            "Origin": "http://localhost:8080",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:8080"
+    assert "authorization" in response.headers["access-control-allow-headers"].lower()
+
+
+def test_cors_preflight_rejects_unknown_origin():
+    client = TestClient(app)
+    response = client.options(
+        "/analysis",
+        headers={
+            "Origin": "https://untrusted.example",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
