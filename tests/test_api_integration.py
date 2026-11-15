@@ -105,3 +105,43 @@ def test_cors_preflight_rejects_unknown_origin():
 
     assert response.status_code == 400
     assert "access-control-allow-origin" not in response.headers
+
+
+def test_decision_history_is_scoped_to_authenticated_user(monkeypatch):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    app.dependency_overrides[current_user] = lambda: "user-1"
+
+    class FakeRepository:
+        def __init__(self, session):
+            assert session is not None
+
+        async def list_recent(self, user_id, *, limit=25):
+            assert user_id == "user-1"
+            assert limit == 10
+            return [
+                SimpleNamespace(
+                    id="decision-1",
+                    question="Explain a sample market scenario",
+                    action="WAIT",
+                    confidence=0.4,
+                    outcome=None,
+                    created_at=datetime(2026, 11, 15, tzinfo=timezone.utc),
+                )
+            ]
+
+    try:
+        monkeypatch.setattr("api.main.DecisionRepository", FakeRepository)
+        async def fake_session():
+            yield object()
+        app.dependency_overrides["api.main.get_session"] = fake_session
+
+        response = TestClient(app).get("/decisions?limit=10")
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["decisions"]) == 1
+        assert body["decisions"][0]["id"] == "decision-1"
+        assert body["decisions"][0]["action"] == "WAIT"
+    finally:
+        app.dependency_overrides.clear()

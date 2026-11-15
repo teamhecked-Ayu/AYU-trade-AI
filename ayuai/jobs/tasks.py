@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from dataclasses import asdict
 
 from celery import Celery
 
@@ -70,16 +71,35 @@ def analyze_question(self, question: str, user_id: str) -> dict:
         await persist_decision(result, user_id)
         decision = result.decision
 
+        debate = result.debate
         return {
             "status": "completed",
             "stage": result.stage,
             "question": result.question,
             "decision_id": result.decision_id,
-            "decision": {
-                "conclusion": decision.conclusion if decision else None,
-                "confidence": decision.confidence if decision else None,
-            },
+            "decision": asdict(decision) if decision else None,
             "provider_count": len(result.analyses),
+            "analyses": [
+                {
+                    "provider": item["provider"],
+                    "model": item["model"],
+                    "content": item["content"],
+                }
+                for item in result.analyses
+            ],
+            "reasoning": asdict(result.reasoning) if result.reasoning else None,
+            "debate": {
+                "status": debate.status,
+                "unresolved_issues": debate.unresolved_issues,
+                "minority_positions": debate.minority_positions,
+                "rounds": [
+                    {
+                        "round_number": item.round_number,
+                        "responses": item.responses,
+                    }
+                    for item in debate.rounds
+                ],
+            } if debate else None,
         }
 
     return asyncio.run(run_pipeline())
