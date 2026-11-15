@@ -1,17 +1,31 @@
 import ccxt.async_support as ccxt
 import os
+
 from core.paper_portfolio import PaperPortfolio
+from core.portfolio_store import SQLitePortfolioStore
 
 
 class BrokerBridge:
-    def __init__(self, paper_trade=None, paper_portfolio=None):
+    def __init__(
+        self,
+        paper_trade=None,
+        paper_portfolio=None,
+        paper_store=None,
+    ):
         self.crypto_exchanges = {}
         self.equity_broker = None
         self.paper_trade = (
             os.getenv("PAPER_TRADE", "true").lower() == "true"
             if paper_trade is None else bool(paper_trade)
         )
-        self.paper_portfolio = paper_portfolio or PaperPortfolio()
+        self.paper_store = paper_store
+        if self.paper_trade and paper_portfolio is None:
+            self.paper_store = paper_store or SQLitePortfolioStore(
+                os.getenv("PAPER_PORTFOLIO_DB", "data/paper_portfolio.db")
+            )
+            self.paper_portfolio = self.paper_store.load()
+        else:
+            self.paper_portfolio = paper_portfolio or PaperPortfolio()
 
     async def init_crypto_exchange(self, exchange_id, api_key, secret):
         if exchange_id in ccxt.exchanges:
@@ -38,7 +52,19 @@ class BrokerBridge:
         if self.paper_trade:
             if price is None:
                 raise ValueError("paper trading requires a current execution price")
-            trade = self.paper_portfolio.execute(symbol, side, amount, float(price))
+            if self.paper_store is not None:
+                trade = self.paper_store.execute(
+                    symbol,
+                    side,
+                    amount,
+                    float(price),
+                    fee_rate=self.paper_portfolio.fee_rate,
+                )
+                self.paper_portfolio = self.paper_store.load(
+                    fee_rate=self.paper_portfolio.fee_rate
+                )
+            else:
+                trade = self.paper_portfolio.execute(symbol, side, amount, float(price))
             return {"status": "paper", "exchange": exchange_id, **trade}
 
         if exchange_id in self.crypto_exchanges:
