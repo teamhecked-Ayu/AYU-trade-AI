@@ -3,6 +3,7 @@
 from .models import MarketCandle, MarketSnapshot, MarketDataError
 from .crypto_data import CCXTMarketDataProvider
 from .service import MarketDataService
+from .validation import ValidatedMarketDataService
 
 __all__ = [
     "MarketCandle",
@@ -10,4 +11,5 @@ __all__ = [
     "MarketDataError",
     "CCXTMarketDataProvider",
     "MarketDataService",
+    "ValidatedMarketDataService",
 ]
