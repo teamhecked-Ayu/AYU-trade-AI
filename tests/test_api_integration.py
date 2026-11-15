@@ -3,6 +3,7 @@
 External systems are replaced with deterministic fakes so these tests verify
 the API contract without requiring Redis, Celery workers, or AI providers.
 """
+
 from fastapi.testclient import TestClient
 
 from api.main import app, current_user
@@ -23,12 +24,16 @@ def test_analysis_requires_authentication():
 
 
 def test_analysis_submit_and_status_flow(monkeypatch):
+    async def fake_submit(question, user_id, session):
+        return AnalysisJob("job-123", "PENDING")
+
+    async def allow_job_owner(job_id, user_id, session):
+        return None
+
     app.dependency_overrides[current_user] = lambda: "user-1"
     try:
-        monkeypatch.setattr(
-            "api.main.submit_analysis",
-            lambda question, user_id: AnalysisJob("job-123", "PENDING"),
-        )
+        monkeypatch.setattr("api.main.submit_analysis", fake_submit)
+        monkeypatch.setattr("api.main.require_analysis_job_owner", allow_job_owner)
         monkeypatch.setattr(
             "api.main.get_analysis_job",
             lambda job_id: AnalysisJob(
@@ -55,8 +60,12 @@ def test_analysis_event_stream_contract(monkeypatch):
         yield 'data: {"job_id":"job-123","state":"PENDING"}\n\n'
         yield 'data: {"job_id":"job-123","state":"SUCCESS"}\n\n'
 
+    async def allow_job_owner(job_id, user_id, session):
+        return None
+
     app.dependency_overrides[current_user] = lambda: "user-1"
     try:
+        monkeypatch.setattr("api.main.require_analysis_job_owner", allow_job_owner)
         monkeypatch.setattr("api.main.analysis_events", fake_events)
         client = TestClient(app)
         response = client.get("/analysis/job-123/events")
