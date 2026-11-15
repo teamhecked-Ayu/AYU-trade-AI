@@ -133,7 +133,7 @@ class DecisionEngine:
         requires_review = (
             confidence < 0.75
             or len(actions) < 2
-            or len(actions) < len(analyses)
+            or len(actions) < expected_count
             or bool(reasoning.contradictions)
             or bool(reasoning.evidence_gaps)
             or bool(debate.unresolved_issues)
