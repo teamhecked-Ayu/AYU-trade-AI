@@ -7,9 +7,10 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ayuai.database.connection import SessionLocal
+from ayuai.database.connection import SessionLocal, engine as database_engine
 from ayuai.database.repositories_users import UserRepository
 from ayuai.database.repositories import DecisionRepository
 from ayuai.jobs.analysis import (
@@ -138,6 +139,44 @@ async def require_analysis_job_owner(
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/ready")
+async def readiness():
+    """Report readiness only when required secrets and runtime services work."""
+    required_secrets = (
+        "AYU_API_KEY",
+        "AYUAI_AUTH_SECRET",
+        "AYUAI_KEY_VAULT_SECRET",
+        "POSTGRES_PASSWORD",
+    )
+    missing = [name for name in required_secrets if not os.getenv(name)]
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "missing_configuration": missing},
+        )
+
+    try:
+        async with database_engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+
+        if RATE_LIMIT_BACKEND == "redis":
+            await redis_auth_limiter.client.ping()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="A required database or rate-limit service is unavailable.",
+        ) from exc
+
+    return {
+        "status": "ready",
+        "dependencies": {
+            "database": "ok",
+            "rate_limiter": RATE_LIMIT_BACKEND,
+        },
+        "paper_mode": os.getenv("PAPER_TRADE", "true").lower() == "true",
+    }
 
 
 @app.post("/auth/register", status_code=201)

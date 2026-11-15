@@ -4,6 +4,7 @@ External systems are replaced with deterministic fakes so these tests verify
 the API contract without requiring Redis, Celery workers, or AI providers.
 """
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app, current_user, get_session
@@ -145,3 +146,57 @@ def test_decision_history_is_scoped_to_authenticated_user(monkeypatch):
         assert body["decisions"][0]["action"] == "WAIT"
     finally:
         app.dependency_overrides.clear()
+
+def test_readiness_fails_when_required_secrets_are_missing(monkeypatch):
+    from api.main import readiness
+    from fastapi import HTTPException
+    import asyncio
+
+    for name in (
+        "AYU_API_KEY",
+        "AYUAI_AUTH_SECRET",
+        "AYUAI_KEY_VAULT_SECRET",
+        "POSTGRES_PASSWORD",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(readiness())
+
+    assert error.value.status_code == 503
+    assert "missing_configuration" in error.value.detail
+
+
+def test_readiness_checks_database_and_reports_ready(monkeypatch):
+    from api import main as api_main
+
+    class FakeConnection:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def execute(self, statement):
+            assert str(statement) == "SELECT 1"
+            return 1
+
+    class FakeEngine:
+        def connect(self):
+            return FakeConnection()
+
+    for name in (
+        "AYU_API_KEY",
+        "AYUAI_AUTH_SECRET",
+        "AYUAI_KEY_VAULT_SECRET",
+        "POSTGRES_PASSWORD",
+    ):
+        monkeypatch.setenv(name, "test-only-secret")
+
+    monkeypatch.setattr(api_main, "database_engine", FakeEngine())
+    monkeypatch.setattr(api_main, "RATE_LIMIT_BACKEND", "memory")
+
+    response = TestClient(app).get("/ready")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+    assert response.json()["dependencies"]["database"] == "ok"
