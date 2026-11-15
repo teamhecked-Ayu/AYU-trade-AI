@@ -1,6 +1,7 @@
 """AYUAI authenticated API boundary with database-backed user accounts."""
 
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,7 +24,15 @@ from ayuai.security.key_vault import KeyVault, CredentialError
 from ayuai.security.rate_limit import RateLimit, RateLimiter
 from ayuai.security.redis_rate_limit import RedisRateLimiter, RateLimitBackendUnavailable
 
-app = FastAPI(title="AYUAI API", version="0.4.0")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    try:
+        yield
+    finally:
+        await redis_auth_limiter.close()
+
+
+app = FastAPI(title="AYUAI API", version="0.4.0", lifespan=lifespan)
 
 # The static dashboard runs on a separate origin during local development.
 # Production deployments should add their exact frontend origins in .env.
@@ -54,7 +63,6 @@ redis_auth_limiter = RedisRateLimiter(
     os.getenv("REDIS_URL", "redis://localhost:6379/0"),
     AUTH_RATE_LIMIT,
 )
-app.add_event_handler("shutdown", redis_auth_limiter.close)
 
 
 class Credentials(BaseModel):
