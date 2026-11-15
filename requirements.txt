@@ -24,7 +24,7 @@ pytest
 openai
 anthropic
 google-genai
-sqlalchemy
+sqlalchemy[asyncio]
 asyncpg
 psycopg[binary]
 aiosqlite
