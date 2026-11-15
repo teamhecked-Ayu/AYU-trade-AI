@@ -9,6 +9,11 @@ class Position:
     quantity: float = 0.0
     average_price: float = 0.0
 
+    @property
+    def average_entry_price(self) -> float:
+        """Compatibility alias used by the older AYUAI paper-trading facade."""
+        return self.average_price
+
 
 @dataclass
 class PaperPortfolio:
@@ -18,6 +23,8 @@ class PaperPortfolio:
     trades: List[dict] = field(default_factory=list)
 
     def execute(self, symbol: str, side: str, quantity: float, price: float) -> dict:
+        if not isinstance(symbol, str) or not symbol.strip():
+            raise ValueError("symbol is required")
         if side not in {"buy", "sell"}:
             raise ValueError("side must be buy or sell")
         if quantity <= 0 or price <= 0:
@@ -43,11 +50,15 @@ class PaperPortfolio:
             position.quantity -= quantity
             self.cash += gross - fee
             if position.quantity == 0:
-                position.average_price = 0.0
+                self.positions.pop(symbol, None)
 
         trade = {
-            "symbol": symbol, "side": side, "quantity": quantity,
-            "price": price, "fee": fee, "cash": self.cash,
+            "symbol": symbol,
+            "side": side,
+            "quantity": quantity,
+            "price": price,
+            "fee": fee,
+            "cash": self.cash,
         }
         self.trades.append(trade)
         return trade

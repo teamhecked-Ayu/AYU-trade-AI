@@ -5,7 +5,6 @@ import logging
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from core.paper_portfolio import PaperPortfolio
 from core.portfolio_store import SQLitePortfolioStore
 import os
 from utils.health import HealthState
@@ -14,10 +13,9 @@ from utils.logging_config import configure_logging
 configure_logging()
 logger = logging.getLogger("ayu_trade_ai.api")
 
-app = FastAPI(title="AYU Trade AI Paper API", version="0.1.0")
+app = FastAPI(title="AYU Trade AI Paper API", version="0.2.0")
 _rate_state = {}
 store = SQLitePortfolioStore(os.getenv("PAPER_PORTFOLIO_DB", "data/paper_portfolio.db"))
-portfolio = store.load()
 health_state = HealthState()
 
 
@@ -38,16 +36,6 @@ async def ready():
     if not os.getenv("AYU_API_KEY"):
         raise HTTPException(status_code=503, detail="API key is not configured")
     return {"status": "ready", "mode": "paper"}
-
-
-@app.get("/metrics")
-async def metrics(x_api_key: str | None = Header(default=None)):
-    await require_api_key(x_api_key)
-    return {
-        "trade_count": len(portfolio.trades),
-        "position_count": len([p for p in portfolio.positions.values() if p.quantity != 0]),
-        "cash": portfolio.cash,
-    }
 
 
 async def require_api_key(x_api_key: str | None = Header(default=None)):
@@ -80,9 +68,21 @@ async def rate_limit(request: Request, call_next):
         raise
 
 
+@app.get("/metrics")
+async def metrics(x_api_key: str | None = Header(default=None)):
+    await require_api_key(x_api_key)
+    portfolio = store.load()
+    return {
+        "trade_count": len(portfolio.trades),
+        "position_count": len([p for p in portfolio.positions.values() if p.quantity != 0]),
+        "cash": portfolio.cash,
+    }
+
+
 @app.get("/portfolio")
 async def get_portfolio(x_api_key: str | None = Header(default=None)):
     await require_api_key(x_api_key)
+    portfolio = store.load()
     return {
         "cash": portfolio.cash,
         "positions": {k: vars(v) for k, v in portfolio.positions.items()},
@@ -94,11 +94,21 @@ async def get_portfolio(x_api_key: str | None = Header(default=None)):
 async def paper_order(order: PaperOrder, x_api_key: str | None = Header(default=None)):
     await require_api_key(x_api_key)
     try:
-        result = portfolio.execute(
-            order.symbol, order.side.lower(), order.quantity, order.price
+        result = store.execute(
+            order.symbol,
+            order.side.lower(),
+            order.quantity,
+            order.price,
         )
-        store.save(portfolio)
-        logger.info("paper_order symbol=%s side=%s quantity=%s price=%s", order.symbol, order.side, order.quantity, order.price)
+        logger.info(
+            "paper_order symbol=%s side=%s quantity=%s price=%s",
+            order.symbol,
+            order.side,
+            order.quantity,
+            order.price,
+        )
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
