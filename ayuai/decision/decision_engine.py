@@ -66,9 +66,21 @@ class DecisionEngine:
         contradiction_penalty = min(0.35, 0.08 * len(reasoning.contradictions))
         gap_penalty = min(0.25, 0.05 * len(reasoning.evidence_gaps))
         failure_penalty = 0.20 if debate.status == "failed" else 0.0
+        coverage_penalty = (
+            0.30 if len(actions) < 2
+            else 0.10 if len(actions) < len(analyses)
+            else 0.0
+        )
         confidence = max(
             0.0,
-            min(1.0, agreement - contradiction_penalty - gap_penalty - failure_penalty),
+            min(
+                1.0,
+                agreement
+                - contradiction_penalty
+                - gap_penalty
+                - failure_penalty
+                - coverage_penalty,
+            ),
         )
 
         if confidence >= 0.75:
@@ -100,8 +112,12 @@ class DecisionEngine:
             rationale.append("No unambiguous, explicitly labelled action conclusion was found.")
 
         requires_review = (
-            confidence < 0.45
+            confidence < 0.75
+            or len(actions) < 2
+            or len(actions) < len(analyses)
             or bool(reasoning.contradictions)
+            or bool(reasoning.evidence_gaps)
+            or bool(debate.unresolved_issues)
             or debate.status != "completed"
             or conclusion == self.INSUFFICIENT
         )

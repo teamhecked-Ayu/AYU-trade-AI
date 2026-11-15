@@ -85,3 +85,49 @@ def test_missing_conclusions_return_insufficient_evidence():
     assert result.conclusion == "INSUFFICIENT EVIDENCE"
     assert result.confidence == 0
     assert result.requires_human_review is True
+
+
+def test_single_provider_never_produces_ready_result():
+    result = DecisionEngine().decide(
+        [{"content": "CONCLUSION: WAIT"}],
+        ReasoningReport(),
+        DebateReport(),
+    )
+
+    assert result.conclusion == "WAIT"
+    assert result.confidence_label == "moderate"
+    assert result.requires_human_review is True
+    assert result.status == "review_required"
+
+
+def test_moderate_majority_requires_human_review():
+    result = DecisionEngine().decide(
+        [
+            {"content": "CONCLUSION: BUY"},
+            {"content": "CONCLUSION: BUY"},
+            {"content": "CONCLUSION: SELL"},
+        ],
+        ReasoningReport(),
+        DebateReport(),
+    )
+
+    assert result.conclusion == "BUY"
+    assert result.confidence_label == "moderate"
+    assert result.requires_human_review is True
+    assert result.status == "review_required"
+
+
+def test_incomplete_provider_conclusions_reduce_confidence_and_require_review():
+    result = DecisionEngine().decide(
+        [
+            {"content": "CONCLUSION: HOLD"},
+            {"content": "CONCLUSION: HOLD"},
+            {"content": "No explicit conclusion was provided."},
+        ],
+        ReasoningReport(),
+        DebateReport(),
+    )
+
+    assert result.conclusion == "HOLD"
+    assert result.confidence < 0.75
+    assert result.requires_human_review is True
