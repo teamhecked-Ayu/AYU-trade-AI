@@ -75,3 +75,25 @@ async def test_auth_and_api_scopes_use_separate_redis_keys(monkeypatch):
     assert client.calls[0][2] != client.calls[1][2]
     assert client.calls[0][2].endswith("auth:192.0.2.10")
     assert client.calls[1][2].endswith("api:192.0.2.10")
+
+
+@pytest.mark.asyncio
+async def test_paper_requests_use_a_separate_redis_bucket():
+    client = FakeRedis()
+    paper = RedisRateLimiter(
+        "redis://unused",
+        RateLimit(requests=60, window_seconds=60),
+        client=client,
+    )
+    api = RedisRateLimiter(
+        "redis://unused",
+        RateLimit(requests=120, window_seconds=60),
+        client=client,
+    )
+
+    await paper.check("paper:192.0.2.10")
+    await api.check("api:192.0.2.10")
+
+    assert client.calls[0][2] != client.calls[1][2]
+    assert client.calls[0][2].endswith("paper:192.0.2.10")
+    assert client.calls[1][2].endswith("api:192.0.2.10")
