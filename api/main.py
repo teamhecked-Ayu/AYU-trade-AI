@@ -153,7 +153,7 @@ async def login(
     credentials: Credentials,
     session: AsyncSession = Depends(get_session),
 ):
-    enforce_rate_limit(request)
+    await enforce_rate_limit(request)
     user = await UserRepository(session).authenticate(credentials.username, credentials.password)
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
