@@ -36,11 +36,22 @@ def test_analysis_payload_contains_dashboard_data_and_omits_internal_prompts():
         ),
         decision_id="decision-123",
         stage="final_decision",
+        expected_provider_count=3,
+        provider_failures=[
+            {
+                "provider": "provider-b",
+                "error": "TimeoutError: provider request failed.",
+                "category": "timeout",
+                "retryable": True,
+            }
+        ],
     )
 
     payload = serialize_analysis_result(result)
 
     assert payload["provider_count"] == 1
+    assert payload["expected_provider_count"] == 3
+    assert payload["provider_failures"][0]["provider"] == "provider-b"
     assert payload["analyses"][0]["content"] == "Independent analysis text"
     assert payload["reasoning"]["agreements"][0]["text"] == "A shared claim"
     assert payload["debate"]["rounds"][0]["responses"]["provider-a"] == "A challenge response"

@@ -15,6 +15,8 @@ def serialize_analysis_result(result) -> dict:
         "decision_id": result.decision_id,
         "decision": asdict(result.decision) if result.decision else None,
         "provider_count": len(result.analyses),
+        "expected_provider_count": result.expected_provider_count or len(result.analyses),
+        "provider_failures": result.provider_failures,
         "analyses": [
             {
                 "provider": item["provider"],

@@ -1,6 +1,6 @@
 """AYUAI master controller with optional persistent decision recording."""
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +23,8 @@ class AnalysisResult:
     decision: FinalDecision | None = None
     decision_id: str | None = None
     stage: str = "independent_analysis"
+    expected_provider_count: int = 0
+    provider_failures: list[dict[str, Any]] = field(default_factory=list)
 
 class AYUAIOrchestrator:
     def __init__(self, provider_manager: ProviderManager, session: AsyncSession | None = None) -> None:
@@ -37,11 +39,38 @@ class AYUAIOrchestrator:
         question = question.strip()
         if not question:
             raise ValueError("A question or task is required.")
-        responses = await self.independent_agent.run(question)
-        analyses = [{"provider": r.provider, "model": r.model, "content": r.content, "metadata": r.metadata} for r in responses]
+        provider_run = await self.independent_agent.run_detailed(question)
+        if not provider_run.responses:
+            raise RuntimeError("All configured AI providers failed.")
+
+        responses = provider_run.responses
+        expected_provider_count = len(self.provider_manager.providers)
+        analyses = [
+            {
+                "provider": response.provider,
+                "model": response.model,
+                "content": response.content,
+                "metadata": response.metadata,
+            }
+            for response in responses
+        ]
+        provider_failures = [
+            {
+                "provider": failure.provider,
+                "error": failure.error,
+                "category": failure.category,
+                "retryable": failure.retryable,
+            }
+            for failure in provider_run.failures
+        ]
         reasoning = self.reasoning_engine.analyze(responses)
         debate = await self.debate_engine.run(question, analyses, reasoning)
-        decision = self.decision_engine.decide(analyses, reasoning, debate)
+        decision = self.decision_engine.decide(
+            analyses,
+            reasoning,
+            debate,
+            expected_provider_count=expected_provider_count,
+        )
 
         decision_id = None
         if self.session is not None and user_id:
@@ -52,5 +81,14 @@ class AYUAIOrchestrator:
             )
             await self.session.commit()
 
-        return AnalysisResult(question=question, analyses=analyses, reasoning=reasoning,
-            debate=debate, decision=decision, decision_id=decision_id, stage="final_decision")
+        return AnalysisResult(
+            question=question,
+            analyses=analyses,
+            reasoning=reasoning,
+            debate=debate,
+            decision=decision,
+            decision_id=decision_id,
+            stage="final_decision",
+            expected_provider_count=expected_provider_count,
+            provider_failures=provider_failures,
+        )
